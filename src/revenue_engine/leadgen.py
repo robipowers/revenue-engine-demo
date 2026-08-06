@@ -307,6 +307,44 @@ def run_all(inbound_dir: Path | None = None, runs_dir=None) -> dict:
     return tally
 
 
+def reset_demo(runs_dir=None) -> str:
+    """Archive the current run state and reseed a clean demo history.
+
+    The audit log is append-only by design, so a demo that has been clicked
+    through a few times accumulates replays. This moves the old log aside
+    (never deletes it) and replays the book once, ending with the three
+    hand-authored beats so they sit at the top of the stream.
+    """
+    from revenue_engine import config, pipeline
+
+    root = Path(runs_dir) if runs_dir else config.RUNS_DIR
+    archive = root / "_dev_archive"
+    archive.mkdir(parents=True, exist_ok=True)
+    stamp = f"{len(list(archive.glob('audit.jsonl.*'))) + 1:03d}"
+    for name in ("audit.jsonl", "routing_state.json"):
+        src = root / name
+        if src.exists():
+            src.rename(archive / f"{name}.{stamp}")
+    for name in ("pending", "resolved"):
+        src = root / name
+        if src.is_dir():
+            src.rename(archive / f"{name}.{stamp}")
+
+    tally = run_all(runs_dir=runs_dir)
+    beats = INBOUND_DIR
+    for lead, approve in (("lead_001", None), ("lead_001", True),
+                          ("lead_002", None), ("lead_003", None)):
+        path = beats / f"{lead}.json"
+        if path.exists():
+            try:
+                pipeline.run(path, approve=approve, runs_dir=runs_dir)
+            except Exception:
+                pass
+    records = sum(1 for _ in (root / "audit.jsonl").open()) if (root / "audit.jsonl").exists() else 0
+    return (f"demo reset: {records} audit records, previous log archived as "
+            f"runs/_dev_archive/audit.jsonl.{stamp}  ({tally})")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--generate", type=int, metavar="N",
@@ -315,7 +353,13 @@ def main() -> None:
                         help="route every generated lead through the real pipeline")
     parser.add_argument("--clean", action="store_true",
                         help="delete generated leads, keeping the hand-authored beats")
+    parser.add_argument("--reset-demo", action="store_true",
+                        help="archive run state and reseed a clean demo history")
     args = parser.parse_args()
+
+    if args.reset_demo:
+        print(reset_demo())
+        return
 
     if args.clean:
         removed = list(INBOUND_DIR.glob(f"{GENERATED_PREFIX}*.json"))

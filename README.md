@@ -40,6 +40,15 @@ uv run python -m revenue_engine.leadgen --generate 40 --run
 uv run python -m revenue_engine.leadgen --clean
 ```
 
+Before a live demo, reset to a clean history in one command. The audit log is
+append-only, so a console that has been clicked through a few times accumulates
+replays; this archives the old log (never deletes it) and replays the book once,
+ending with the three beats so they sit at the top of the stream:
+
+```
+uv run python -m revenue_engine.leadgen --reset-demo
+```
+
 This fabricates **inputs only**, exactly as `warehouse --rebuild` already does
 for accounts and activities. Every score, assignment and audit record is still
 produced by running the real pipeline over those leads. The generator also

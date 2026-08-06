@@ -1,0 +1,8 @@
+duckdb==1.5.5
+scikit-learn==1.9.0
+rapidfuzz==3.14.5
+joblib==1.5.3
+mcp==2.0.0
+
+[llm]
+anthropic

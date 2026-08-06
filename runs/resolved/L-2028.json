@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2028",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2028",
+    "account_id": 11,
+    "account_name": "Wharfline",
+    "rep": "Tomas Lindqvist",
+    "territory": "EMEA",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0375,
+    "intent": {
+      "intent": "pricing_inquiry",
+      "summary": "Asked for pricing for a team of 35. Budget is approved for this quarter."
+    }
+  }
+}

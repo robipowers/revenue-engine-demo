@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2030",
+  "proposal": {
+    "lead_id": "L-2030",
+    "account_id": 25,
+    "account_name": "Signalfoundry",
+    "rep": "Maya Delgado",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0659,
+    "intent": {
+      "intent": "general_interest",
+      "summary": "Signed up for the newsletter and asked to be contacted next quarter."
+    }
+  },
+  "lead_path": "/Users/robipowers/Downloads/leandata-revenue-engine-demo/data/inbound/lead_g030.json"
+}

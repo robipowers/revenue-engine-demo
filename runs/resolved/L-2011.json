@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2011",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2011",
+    "account_id": 38,
+    "account_name": "Graniteway",
+    "rep": "Chris Okafor",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.2553,
+    "intent": {
+      "intent": "evaluation",
+      "summary": "Running a POC against two other vendors. Needs integration detail for Salesforce."
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2032",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2032",
+    "account_id": 39,
+    "account_name": "Petalstream",
+    "rep": "Tomas Lindqvist",
+    "territory": "EMEA",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0605,
+    "intent": {
+      "intent": "pricing_inquiry",
+      "summary": "Asked for pricing for a team of 12. Budget is approved for this quarter."
+    }
+  }
+}

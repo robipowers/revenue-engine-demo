@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2026",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2026",
+    "account_id": 23,
+    "account_name": "Marrowtech",
+    "rep": "Maya Delgado",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0001,
+    "intent": {
+      "intent": "general_interest",
+      "summary": "Downloaded the routing guide. No timeline given yet."
+    }
+  }
+}

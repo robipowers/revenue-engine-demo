@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-1002",
+  "proposal": {
+    "lead_id": "L-1002",
+    "account_id": 3,
+    "account_name": "Hivemetric",
+    "rep": "Maya Delgado",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0017,
+    "intent": {
+      "intent": "pricing_inquiry",
+      "summary": "hey -- we're re-evaluating vendors,, budget already approved!! need pricing + integration details asap b4 end of Q. also who"
+    }
+  },
+  "lead_path": "/Users/robipowers/Downloads/leandata-revenue-engine-demo/data/inbound/lead_002.json"
+}

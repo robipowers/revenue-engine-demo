@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2001",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2001",
+    "account_id": 8,
+    "account_name": "Copperstack",
+    "rep": "Maya Delgado",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0089,
+    "intent": {
+      "intent": "pricing_inquiry",
+      "summary": "hey - what does this cost for 6 seats? budget already signed off"
+    }
+  }
+}

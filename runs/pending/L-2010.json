@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2010",
+  "proposal": {
+    "lead_id": "L-2010",
+    "account_id": 31,
+    "account_name": "Nimbuslane",
+    "rep": "Alicia Zhang",
+    "territory": "AMER-West",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.231,
+    "intent": {
+      "intent": "evaluation",
+      "summary": "Re-evaluating vendors this quarter. Asked about migration from their current tool."
+    }
+  },
+  "lead_path": "/Users/robipowers/Downloads/leandata-revenue-engine-demo/data/inbound/lead_g010.json"
+}

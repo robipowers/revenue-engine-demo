@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2003",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2003",
+    "account_id": 22,
+    "account_name": "Slateport",
+    "rep": "Tomas Lindqvist",
+    "territory": "EMEA",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0186,
+    "intent": {
+      "intent": "demo_request",
+      "summary": "Asked for a walkthrough with the RevOps team. Timeline is this quarter."
+    }
+  }
+}

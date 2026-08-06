@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2017",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2017",
+    "account_id": 40,
+    "account_name": "Windrose Systems",
+    "rep": "Sarah Nguyen",
+    "territory": "APAC",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.2198,
+    "intent": {
+      "intent": "general_interest",
+      "summary": "Signed up for the newsletter and asked to be contacted next quarter."
+    }
+  }
+}

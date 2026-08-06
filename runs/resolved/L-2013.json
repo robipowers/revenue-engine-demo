@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2013",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2013",
+    "account_id": 12,
+    "account_name": "Pinemetric",
+    "rep": "Alicia Zhang",
+    "territory": "AMER-West",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0735,
+    "intent": {
+      "intent": "support",
+      "summary": "Reported an issue with duplicate leads. Asked for support contact."
+    }
+  }
+}

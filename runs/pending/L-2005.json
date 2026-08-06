@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2005",
+  "proposal": {
+    "lead_id": "L-2005",
+    "account_id": 36,
+    "account_name": "Juniper Ledger",
+    "rep": "Maya Delgado",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0461,
+    "intent": {
+      "intent": "demo_request",
+      "summary": "Booked time for a technical demo. Wants routing and matching covered."
+    }
+  },
+  "lead_path": "/Users/robipowers/Downloads/leandata-revenue-engine-demo/data/inbound/lead_g005.json"
+}

@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2002",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2002",
+    "account_id": 15,
+    "account_name": "Lumenride",
+    "rep": "Jordan Feldman",
+    "territory": "AMER-West",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0082,
+    "intent": {
+      "intent": "pricing_inquiry",
+      "summary": "Inbound from the pricing page. Early-stage, wants a technical overview call."
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2018",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2018",
+    "account_id": 7,
+    "account_name": "Draftwell",
+    "rep": "Alicia Zhang",
+    "territory": "AMER-West",
+    "priority": "P1",
+    "sla_minutes": 15,
+    "propensity_score": 0.9505,
+    "intent": {
+      "intent": "support",
+      "summary": "Reported an issue with duplicate leads. Asked for support contact."
+    }
+  }
+}

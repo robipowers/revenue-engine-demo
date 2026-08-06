@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2027",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2027",
+    "account_id": 4,
+    "account_name": "Northbeam Labs",
+    "rep": "Alicia Zhang",
+    "territory": "AMER-West",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.1022,
+    "intent": {
+      "intent": "pricing_inquiry",
+      "summary": "hey - what does this cost for 4 seats? budget already signed off"
+    }
+  }
+}

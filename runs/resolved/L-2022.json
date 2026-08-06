@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2022",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2022",
+    "account_id": 35,
+    "account_name": "Thornfield Analytics",
+    "rep": "Tomas Lindqvist",
+    "territory": "EMEA",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0002,
+    "intent": {
+      "intent": "evaluation",
+      "summary": "Running a POC against two other vendors. Needs integration detail for Salesforce."
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2024",
+  "disposition": "routed_to_review",
+  "proposal": {
+    "lead_id": "L-2024",
+    "account_id": 9,
+    "account_name": "Brightquay",
+    "rep": "Tomas Lindqvist",
+    "territory": "EMEA",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.4038,
+    "intent": {
+      "intent": "evaluation",
+      "summary": "Running a POC against two other vendors. Needs integration detail for Salesforce."
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2015",
+  "proposal": {
+    "lead_id": "L-2015",
+    "account_id": 26,
+    "account_name": "Meterhouse",
+    "rep": "Tomas Lindqvist",
+    "territory": "EMEA",
+    "priority": "P1",
+    "sla_minutes": 15,
+    "propensity_score": 0.9727,
+    "intent": {
+      "intent": "pricing_inquiry",
+      "summary": "Wants a quote before the board meeting. Needs cost per seat at 20 users."
+    }
+  },
+  "lead_path": "/Users/robipowers/Downloads/leandata-revenue-engine-demo/data/inbound/lead_g015.json"
+}

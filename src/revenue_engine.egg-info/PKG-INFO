@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: revenue-engine
+Version: 0.1.0
+Summary: Autonomous revenue engine demo: mini-warehouse, MCP context layer, propensity model, agentic routing
+Requires-Python: >=3.11
+Requires-Dist: duckdb==1.5.5
+Requires-Dist: scikit-learn==1.9.0
+Requires-Dist: rapidfuzz==3.14.5
+Requires-Dist: joblib==1.5.3
+Requires-Dist: mcp==2.0.0
+Provides-Extra: llm
+Requires-Dist: anthropic; extra == "llm"

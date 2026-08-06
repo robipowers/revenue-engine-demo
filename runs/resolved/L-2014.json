@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2014",
+  "disposition": "routed_to_review",
+  "proposal": {
+    "lead_id": "L-2014",
+    "account_id": 19,
+    "account_name": "Ridgeplane",
+    "rep": "Jordan Feldman",
+    "territory": "AMER-West",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0152,
+    "intent": {
+      "intent": "evaluation",
+      "summary": "Re-evaluating vendors this quarter. Asked about migration from their current tool."
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2023",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2023",
+    "account_id": 2,
+    "account_name": "Parcelbase",
+    "rep": "Maya Delgado",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0068,
+    "intent": {
+      "intent": "demo_request",
+      "summary": "Attended the webinar and wants a demo for the ops team of 20."
+    }
+  }
+}

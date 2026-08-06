@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2021",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2021",
+    "account_id": 28,
+    "account_name": "Palisade Data",
+    "rep": "Chris Okafor",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0012,
+    "intent": {
+      "intent": "evaluation",
+      "summary": "comparing us against incumbents,, needs integration + migration answers b4 EOQ"
+    }
+  }
+}

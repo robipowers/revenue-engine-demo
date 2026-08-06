@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2025",
+  "proposal": {
+    "lead_id": "L-2025",
+    "account_id": 16,
+    "account_name": "Harborlytics",
+    "rep": "Chris Okafor",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.012,
+    "intent": {
+      "intent": "pricing_inquiry",
+      "summary": "Wants a quote before the board meeting. Needs cost per seat at 6 users."
+    }
+  },
+  "lead_path": "/Users/robipowers/Downloads/leandata-revenue-engine-demo/data/inbound/lead_g025.json"
+}

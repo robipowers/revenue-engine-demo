@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2020",
+  "proposal": {
+    "lead_id": "L-2020",
+    "account_id": 21,
+    "account_name": "Cobbleworks",
+    "rep": "Maya Delgado",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.1478,
+    "intent": {
+      "intent": "support",
+      "summary": "having a problem with lead assignment -- some reps not getting anything"
+    }
+  },
+  "lead_path": "/Users/robipowers/Downloads/leandata-revenue-engine-demo/data/inbound/lead_g020.json"
+}

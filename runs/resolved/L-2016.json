@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2016",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2016",
+    "account_id": 33,
+    "account_name": "Kelpline Marine",
+    "rep": "Kenji Watanabe",
+    "territory": "APAC",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.002,
+    "intent": {
+      "intent": "support",
+      "summary": "Reported an issue with duplicate leads. Asked for support contact."
+    }
+  }
+}

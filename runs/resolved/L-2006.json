@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2006",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2006",
+    "account_id": 3,
+    "account_name": "Hivemetric",
+    "rep": "Alicia Zhang",
+    "territory": "AMER-West",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0017,
+    "intent": {
+      "intent": "pricing_inquiry",
+      "summary": "Asked for pricing for a team of 12. Budget is approved for this quarter."
+    }
+  }
+}

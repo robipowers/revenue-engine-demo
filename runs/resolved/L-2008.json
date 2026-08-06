@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2008",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2008",
+    "account_id": 17,
+    "account_name": "Quillstack",
+    "rep": "Maya Delgado",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0,
+    "intent": {
+      "intent": "support",
+      "summary": "Existing routing rules are broken after their Salesforce release. Needs help."
+    }
+  }
+}

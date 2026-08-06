@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2012",
+  "disposition": "assignment_applied",
+  "proposal": {
+    "lead_id": "L-2012",
+    "account_id": 5,
+    "account_name": "Fielddesk",
+    "rep": "Jordan Feldman",
+    "territory": "AMER-West",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.2477,
+    "intent": {
+      "intent": "pricing_inquiry",
+      "summary": "Wants a quote before the board meeting. Needs cost per seat at 20 users."
+    }
+  }
+}

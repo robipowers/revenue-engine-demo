@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2029",
+  "disposition": "routed_to_review",
+  "proposal": {
+    "lead_id": "L-2029",
+    "account_id": 18,
+    "account_name": "Vantagemill",
+    "rep": "Chris Okafor",
+    "territory": "AMER-East",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0089,
+    "intent": {
+      "intent": "evaluation",
+      "summary": "Re-evaluating vendors this quarter. Asked about migration from their current tool."
+    }
+  }
+}

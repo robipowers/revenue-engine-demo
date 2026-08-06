@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-2009",
+  "disposition": "routed_to_review",
+  "proposal": {
+    "lead_id": "L-2009",
+    "account_id": 24,
+    "account_name": "Ovalgrid",
+    "rep": "Jordan Feldman",
+    "territory": "AMER-West",
+    "priority": "P2",
+    "sla_minutes": 240,
+    "propensity_score": 0.0144,
+    "intent": {
+      "intent": "pricing_inquiry",
+      "summary": "Inbound from the pricing page. Early-stage, wants a technical overview call."
+    }
+  }
+}
