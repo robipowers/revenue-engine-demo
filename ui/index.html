@@ -1220,15 +1220,30 @@ function vInsights(v){
            <i style="display:block;height:100%;width:${p.toFixed(1)}%;background:var(--brand)"></i></span>
          <span class="num" style="font-size:11px;color:var(--ink-2);width:34px;text-align:right">${p.toFixed(0)}%</span></span>`;
      }, sort:r=>r.routed},
+    {key:'leads', label:'Leads handled', type:'text', w:'150px',
+     sort:r=>repLeads(r.name).length,
+     render:r=>{ const L=repLeads(r.name);
+       return L.length ? L.map(x=>`<span class="chip" style="background:var(--bg-active);color:var(--ink-2)">${esc(x)}</span>`).join(' ')
+                       : '<span style="color:var(--ink-3)">none</span>'; }},
     {key:'last_ts', label:'Last touch', type:'time', w:'150px',
      render:r=>r.last_ts?`<span class="mono">${fmtTime(r.last_ts)}</span>`:'<span style="color:var(--ink-3)">never</span>',
      sort:r=>r.last_ts},
   ];
-  const h=el('div','phead');
-  h.innerHTML=`<h2>Rep load</h2><div class="sp"></div><span class="pmeta">routed · applied · skipped, from the append-only log</span>`;
-  v.appendChild(h);
-  const host=el('div'); v.appendChild(host);
-  renderTable(host,'insights',cols,reps,{unit:'reps', sortKey:'routed', sortDir:'desc'});
+  v.classList.add('view-table');
+  const host=el('div'); host.style.cssText='flex:1;display:flex;flex-direction:column;min-height:0';
+  v.appendChild(host);
+  renderTable(host,'insights',cols,reps,{unit:'reps', sortKey:'routed', sortDir:'desc',
+    hint:'load is derived from the append-only log, not stored per rep'});
+}
+/* Which leads a rep actually touched, from routing + applied records. */
+function repLeads(name){
+  const out = [];
+  S.audit.records.forEach(r=>{
+    const d = r.decision||{};
+    if((r.stage==='routing'||r.stage==='assignment_applied') && d.rep===name && r.lead_id
+       && !out.includes(r.lead_id)) out.push(r.lead_id);
+  });
+  return out;
 }
 function vRoundRobin(v){
   topbar('Round Robin', `rotation cursors from runs/routing_state.json · ${S.stats.reps} reps across ${S.stats.territories} territories`, []);
@@ -1244,7 +1259,7 @@ function vRoundRobin(v){
       ${chip(reps.length+' reps', PAIR.mute)}
       ${cursor!=null?chip('CURSOR '+cursor, PAIR.brand):chip('NOT YET ROTATED', PAIR.mute)}
       <div class="sp"></div>
-      <span class="hint">${num(accs.length)} accounts · ${moneyK(accs.reduce((s,a)=>s+a.open_amount,0))} open pipeline</span></div>`;
+      <span class="hint">${num(accs.length)} accounts · ${moneyK(accs.reduce((s,a)=>s+a.open_amount,0))} open pipeline · ${num(accs.reduce((s,a)=>s+a.activities_30d,0))} activities in 30d</span></div>`;
     const grid = el('div','hl'); grid.style.gridTemplateColumns='repeat(2,1fr)';
     reps.forEach((rep,i)=>{
       const d = roster[rep.name];
