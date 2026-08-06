@@ -81,6 +81,10 @@ svg{display:block}
 .btn-p:hover{background:#4338CA;color:#fff}
 .btn:disabled{opacity:.5;cursor:default}
 .view{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0}
+/* Table views hand scrolling to .tw so the sticky thead has a scrolling
+   ancestor it actually belongs to — sticky against .view never engages. */
+.view.view-table{overflow:hidden;display:flex;flex-direction:column}
+.view.view-table .tw{flex:1;overflow:auto;min-height:0}
 
 /* ---------- chips ---------- */
 .chip{
@@ -113,6 +117,20 @@ svg{display:block}
 
 /* ---------- table ---------- */
 .tw{width:100%;overflow-x:auto}
+.tbar{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--line);
+  background:var(--bg);flex:none}
+.srch{display:flex;align-items:center;gap:6px;height:28px;padding:0 9px;border:1px solid var(--line);
+  border-radius:6px;background:var(--bg);min-width:210px}
+.srch:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)}
+.srch svg{width:13px;height:13px;color:var(--ink-3);flex:none}
+.srch input{border:none;outline:none;font:inherit;font-size:12.5px;color:var(--ink);width:100%;background:none}
+.srch input::placeholder{color:var(--ink-3)}
+.tbar .cnt{font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbar .sp{flex:1}
+.fchip{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border:1px solid var(--line);
+  border-radius:6px;font-size:12px;color:var(--ink-2);background:var(--bg);white-space:nowrap}
+.fchip:hover{background:var(--bg-hover);color:var(--ink)}
+.fchip.on{background:var(--brand-tint);border-color:#C9CCF7;color:var(--brand-ink);font-weight:600}
 table.t{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 table.t th{
   position:sticky;top:0;z-index:4;background:var(--bg-sunken);border-bottom:1px solid var(--line);
@@ -205,11 +223,22 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 }
 .attr{display:flex;align-items:center;gap:9px;min-height:31px;padding:3px 16px}
 .attr:hover{background:var(--bg-hover)}
-.attr-k{display:flex;align-items:center;gap:7px;width:112px;flex:none;color:var(--ink-2);font-size:12.5px}
+.attr-k{display:flex;align-items:center;gap:7px;width:136px;flex:none;color:var(--ink-2);font-size:12.5px}
 .attr-k svg{width:12.5px;height:12.5px;opacity:.5;flex:none}
 .attr-k span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .attr-v{font-size:12.5px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .attr-v.none,.attr-v .none{color:var(--ink-3)}
+.attr-v .mono,.attr-v.mono{font-size:11px}
+.prow{display:flex;align-items:flex-start;gap:9px;padding:6px 16px}
+.prow:hover{background:var(--bg-hover)}
+.prow .av{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;flex:none;margin-top:1px}
+.prow .av svg{width:11px;height:11px}
+.prow .pt{min-width:0}
+.prow .pn{font-size:12.5px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .ps{font-size:11.5px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note{padding:2px 16px 10px}
+.note p{font-size:12px;line-height:1.55;color:var(--ink-2);background:var(--bg-sunken);
+  border:1px solid var(--line);border-radius:7px;padding:9px 11px;white-space:pre-wrap}
 
 .body{min-width:0;display:flex;flex-direction:column}
 .tabs{display:flex;gap:2px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--bg);flex:none}
@@ -223,15 +252,16 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 .tab .n{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;background:var(--bg-active);padding:0 5px;border-radius:4px;line-height:16px}
 .pad{padding:16px 18px 26px}
 .sec-h{display:flex;align-items:center;gap:8px;margin:0 0 10px;flex-wrap:wrap}
-.sec-h h3{font-size:12px;font-weight:650;letter-spacing:.045em;color:var(--ink-3)}
+.sec-h h3{font-size:13.5px;font-weight:600;letter-spacing:-.005em;color:var(--ink)}
 .sec-h .sp{flex:1;min-width:6px}
 .sec-h .hint{font-size:11px;color:var(--ink-3)}
-.sec+.sec{margin-top:22px}
+.sec{margin-top:22px}
+.sec:first-child{margin-top:0}
 
 .hl{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .hlc{border:1px solid var(--line);border-radius:8px;padding:11px 13px 12px;background:var(--bg);box-shadow:var(--shadow);min-width:0}
 .hlc-t{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-3);font-weight:500;min-width:0}
-.hlc-t svg{width:12px;height:12px;margin-left:auto;opacity:.45;flex:none}
+.hlc-t svg{width:12px;height:12px;margin-left:auto;opacity:.9;color:var(--ink-3);flex:none}
 .hlc-v{font-size:23px;font-weight:650;letter-spacing:-.025em;margin-top:6px;line-height:1.15;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
 .hlc-v .u{font-size:12px;font-weight:500;color:var(--ink-3);letter-spacing:0}
 .hlc-s{font-size:11px;color:var(--ink-3);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -277,7 +307,7 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 
 /* ---------- waterfall ---------- */
 .wf{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--line)}
-.wf-h,.wf-r{display:grid;grid-template-columns:28px minmax(112px,1fr) minmax(150px,1.4fr) 120px minmax(90px,1.3fr);gap:1px}
+.wf-h,.wf-r{display:grid;grid-template-columns:28px minmax(112px,.9fr) 200px 118px minmax(150px,1.6fr);gap:1px}
 .wf-h{margin-bottom:1px}
 .wf-r{margin-bottom:1px}
 .wf-r:last-child{margin-bottom:0}
@@ -291,9 +321,9 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 .gl svg{width:10px;height:10px}
 
 /* ---------- contribution bars ---------- */
-.cb{display:grid;grid-template-columns:180px 1fr 66px;gap:10px;align-items:center;padding:5px 0}
+.cb{display:grid;grid-template-columns:minmax(240px,auto) minmax(0,340px) 70px;gap:12px;align-items:center;padding:5px 0}
 .cb+.cb{border-top:1px solid var(--line-soft)}
-.cb-k{font-family:var(--mono);font-size:11px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cb-k{font-family:var(--mono);font-size:11px;color:var(--ink-2);white-space:nowrap}
 .cb-t{position:relative;height:16px;background:var(--bg-sunken);border-radius:3px}
 .cb-t .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--line)}
 .cb-t i{position:absolute;top:3px;height:10px;border-radius:2px}
@@ -382,6 +412,7 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 <symbol id="i-target" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.9" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2.8" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r=".9" fill="currentColor"/></symbol>
 <symbol id="i-act" viewBox="0 0 16 16"><path d="M1.8 8.4h3L6.6 4l2.8 8 1.8-3.6h3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="i-dl" viewBox="0 0 16 16"><path d="M8 2.4v7.4M4.8 6.9 8 10.1l3.2-3.2M2.8 13.2h10.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-srch" viewBox="0 0 16 16"><circle cx="7.2" cy="7.2" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.6 10.6 3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
 <symbol id="i-car" viewBox="0 0 16 16"><path d="M4.6 6.6 8 3.4l3.4 3.2M4.6 9.4 8 12.6l3.4-3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="i-up" viewBox="0 0 16 16"><path d="M4.4 9.8 8 6.2l3.6 3.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="i-dn" viewBox="0 0 16 16"><path d="M4.4 6.2 8 9.8l3.6-3.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -417,7 +448,7 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
    ========================================================================= */
 
 const S = { stats:null, leads:[], accounts:[], contacts:[], opps:[], audit:null,
-            desk:null, terr:null, run:null, runLead:null, tab:'overview', busy:false };
+            desk:null, terr:null, scores:null, run:null, runLead:null, tab:'overview', busy:false };
 
 const $ = (s,r=document)=>r.querySelector(s);
 const el = (t,c,x)=>{const n=document.createElement(t); if(c)n.className=c; if(x!=null)n.textContent=x; return n;};
@@ -466,6 +497,18 @@ function ago(v, asOf){
   if(d==null) return '—';
   return d===0 ? 'today' : d===1 ? '1 day ago' : d<30 ? d+' days ago' : Math.floor(d/30)+' mo ago';
 }
+/* Nothing formatted for display may contain a JS coercion artifact. An audit
+   record that prints "SLA undefinedm" destroys trust in every other number on
+   the page, so the guard renders an em-dash instead and says so in the console. */
+function safe(str){
+  const t = String(str==null?'':str);
+  if(/\bundefined\b|\[object Object\]|\bNaN\b/.test(t)){
+    console.warn('Relay: suppressed unrenderable value ->', t);
+    return t.replace(/\s*·?\s*[^·]*(undefined|\[object Object\]|NaN)[^·]*/g,'').replace(/^\s*·\s*|\s*·\s*$/g,'') || '—';
+  }
+  return t;
+}
+const fmtAuc = () => S.stats.model.holdout_auc.toFixed(4);
 const titleize = s => String(s||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
 const initials = s => String(s||'?').replace(/[^A-Za-z0-9 ]/g,'').split(/\s+/).filter(Boolean)
                         .slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
@@ -513,13 +556,13 @@ async function getJSON(u,opt){
   return r.json();
 }
 async function boot(){
-  const [stats,leads,acc,con,opp,aud,desk,terr] = await Promise.all([
+  const [stats,leads,acc,con,opp,aud,desk,terr,sco] = await Promise.all([
     getJSON('/api/stats'), getJSON('/api/leads'), getJSON('/api/accounts'),
     getJSON('/api/contacts'), getJSON('/api/opportunities'), getJSON('/api/audit'),
-    getJSON('/api/desk'), getJSON('/api/territories'),
+    getJSON('/api/desk'), getJSON('/api/territories'), getJSON('/api/scores'),
   ]);
   S.stats=stats; S.leads=leads.leads; S.accounts=acc.accounts; S.contacts=con.contacts;
-  S.opps=opp.opportunities; S.audit=aud; S.desk=desk; S.terr=terr;
+  S.opps=opp.opportunities; S.audit=aud; S.desk=desk; S.terr=terr; S.scores=sco;
   $('#navClock').textContent = 'as of '+fmtTime(stats.as_of);
   renderNav();
 
@@ -598,6 +641,12 @@ function renderNav(){
   }
 }
 /* Full roster from config (all reps), merged with real audit-derived load. */
+/* SLA is configured per priority tier, so it is rendered as the map it is. */
+function slaText(){
+  const m = S.terr.sla_minutes;
+  if(m && typeof m==='object') return Object.entries(m).map(([k,v])=>`${k} SLA ${v}m`).join(' · ');
+  return `SLA ${m}m`;
+}
 function repRoster(){
   const out = {};
   const t = S.terr ? S.terr.territories : {};
@@ -617,9 +666,21 @@ function repRoster(){
 const TYPE_ICON = {text:'i-txt',num:'i-hash',money:'i-cash',date:'i-cal',enum:'i-tag',
                    person:'i-user',link:'i-link',time:'i-clock',mono:'i-hash'};
 const sortState = {};
+const filterState = {};
+/* Plain-text search over the values a row actually renders, so what you type
+   matches what you can see. */
+function rowText(r, cols){
+  return cols.map(c=>{
+    const v = c.sort ? c.sort(r) : r[c.key];
+    return v==null ? '' : String(v);
+  }).join(' \u0001 ').toLowerCase();
+}
 function renderTable(host, id, cols, rows, opts){
   opts = opts||{};
   const st = sortState[id] || (sortState[id] = {key:opts.sortKey||cols[0].key, dir:opts.sortDir||'asc'});
+  const q = (filterState[id]||'').trim().toLowerCase();
+  const all = rows;
+  if(q) rows = rows.filter(r=>rowText(r,cols).includes(q));
   const col = cols.find(c=>c.key===st.key) || cols[0];
   const val = r => col.sort ? col.sort(r) : r[col.key];
   const data = rows.slice().sort((a,b)=>{
@@ -632,6 +693,38 @@ function renderTable(host, id, cols, rows, opts){
     return st.dir==='asc' ? (x<y?-1:x>y?1:0) : (x<y?1:x>y?-1:0);
   });
 
+  host.innerHTML='';
+  if(opts.search!==false){
+    const bar = el('div','tbar');
+    const box = el('label','srch');
+    box.innerHTML = ico('i-srch');
+    const inp = el('input');
+    inp.type='text'; inp.value = filterState[id]||'';
+    inp.placeholder = `Search ${opts.unit||'rows'}\u2026`;
+    inp.oninput = ()=>{
+      filterState[id] = inp.value;
+      const at = inp.selectionStart;
+      renderTable(host, id, cols, all, opts);
+      const next = host.querySelector('.srch input');
+      if(next){ next.focus(); next.setSelectionRange(at, at); }
+    };
+    box.appendChild(inp); bar.appendChild(box);
+    const cnt = el('span','cnt');
+    cnt.innerHTML = q
+      ? `<b style="color:var(--ink)">${num(rows.length)}</b> of ${num(all.length)} ${esc(opts.unit||'rows')}`
+      : `${num(all.length)} ${esc(opts.unit||'rows')} · ${cols.length} columns`;
+    bar.appendChild(cnt);
+    if(q){
+      const clr = el('button','fchip on','Clear');
+      clr.onclick = ()=>{ filterState[id]=''; renderTable(host, id, cols, all, opts); };
+      bar.appendChild(clr);
+    }
+    bar.appendChild(el('div','sp'));
+    const sorted = el('span','cnt');
+    sorted.textContent = `sorted by ${col.label||col.key} ${st.dir==='asc'?'ascending':'descending'}`;
+    bar.appendChild(sorted);
+    host.appendChild(bar);
+  }
   const wrap = el('div','tw');
   const t = el('table','t');
   /* Legibility floor: below this the pane scrolls horizontally instead of
@@ -652,7 +745,7 @@ function renderTable(host, id, cols, rows, opts){
     th.onclick = ()=>{
       if(st.key===c.key) st.dir = st.dir==='asc'?'desc':'asc';
       else { st.key=c.key; st.dir = (c.type==='num'||c.type==='money'||c.type==='date'||c.type==='time')?'desc':'asc'; }
-      renderTable(host, id, cols, rows, opts);
+      renderTable(host, id, cols, all, opts);
     };
     htr.appendChild(th);
   });
@@ -688,7 +781,12 @@ function renderTable(host, id, cols, rows, opts){
   tf.appendChild(ftr); t.appendChild(tf);
 
   wrap.appendChild(t);
-  host.innerHTML=''; host.appendChild(wrap);
+  host.appendChild(wrap);
+  if(!data.length){
+    const e = el('div','empty');
+    e.innerHTML = `No ${esc(opts.unit||'rows')} match <b>${esc(filterState[id]||'')}</b>.`;
+    host.appendChild(e);
+  }
 }
 const sum = (rows,k)=>rows.reduce((a,r)=>a+(Number(r[k])||0),0);
 const footSum   = k => rows => `<b>Σ</b> ${num(sum(rows,k))}`;
@@ -712,7 +810,7 @@ function topbar(title, sub, actions){
 function route(){
   const r = currentRoute();
   renderNav();
-  const v = $('#view'); v.scrollTop=0;
+  const v = $('#view'); v.scrollTop=0; v.classList.remove('view-table');
   ({overview:vOverview, queue:vQueue, insights:vInsights, audit:vAudit, rr:vRoundRobin,
     terr:vTerritories, accounts:vAccounts, contacts:vContacts, opps:vOpps, model:vModel,
     lead:vLead}[r.view]||vOverview)(v, r.arg);
@@ -736,7 +834,7 @@ function vOverview(v){
    ['i-target','WIN RATE', (wh.opps_won/Math.max(1,wh.opps_won+wh.opps_lost)*100).toFixed(0)+'%', `${wh.opps_won} won · ${wh.opps_lost} lost`],
    ['i-log','DECISIONS', num(S.audit.total), `${Object.keys(S.audit.stages).length} stages · append-only`],
    ['i-shield','FALLBACKS', fbRate.toFixed(1)+'%', `${num(S.audit.fallbacks)} deterministic recoveries`],
-   ['i-cpu','HOLDOUT AUC', st.model.holdout_auc.toFixed(3), `${st.model.n_features} features · n=${st.model.n_train}/${st.model.n_test}`],
+   ['i-cpu','HOLDOUT AUC', fmtAuc(), `${st.model.n_features} features · n=${st.model.n_train}/${st.model.n_test}`],
   ].forEach(([icn,l,val,s])=>{
     const c = el('div','strip-c');
     c.innerHTML = `<div class="strip-l">${ico(icn)}${l}</div><div class="strip-v">${esc(val)}</div><div class="strip-s" title="${esc(s)}">${esc(s)}</div>`;
@@ -833,7 +931,7 @@ function auditCols(compact){
      sort:r=>r.fallback_used?1:0,
      foot:rows=>`<b>${rows.filter(r=>r.fallback_used).length}</b> used`},
     {key:'outcome', label:'Decision', type:'text',
-     render:r=>`<span style="color:var(--ink-2)" title="${esc(auditSummary(r))}">${esc(auditSummary(r, compact))}</span>`,
+     render:r=>`<span style="color:var(--ink-2)" title="${esc(safe(auditSummary(r)))}">${esc(safe(auditSummary(r, compact)))}</span>`,
      sort:r=>auditSummary(r)},
   ];
   if(!compact) cols.push(
@@ -848,8 +946,12 @@ function auditSummary(r, compact){
   if(d.status==='ambiguous') return `ambiguous · ${(d.candidates||[]).length} candidates @ ${d.score}`;
   if(d.account_name) return `${d.status?d.status+' → ':''}${d.account_name}${d.score!=null?' ('+d.score+')':''}`;
   if(d.propensity_score!=null) return `propensity ${d.propensity_score}`;
-  if(d.rep) return compact ? `${d.rep} · ${d.territory} · ${d.priority}`
-                           : `${d.rep} · ${d.territory} · ${d.priority} · SLA ${d.sla_minutes}m`;
+  if(d.rep){
+    /* assignment_applied records carry rep/territory/priority but no SLA, so
+       the SLA clause is appended only when the record actually has one. */
+    const base = `${d.rep} · ${d.territory} · ${d.priority}`;
+    return (compact || d.sla_minutes==null) ? base : `${base} · SLA ${d.sla_minutes}m`;
+  }
   if(d.skipped_rep) return `skip ${d.skipped_rep} · ${d.reason.replace(/_/g,' ')}`;
   if(d.intent) return String(d.intent);
   if(d.awaiting) return `awaiting ${d.awaiting.replace(/_/g,' ')}`;
@@ -859,30 +961,47 @@ function auditSummary(r, compact){
   return k ? `${k}: ${JSON.stringify(d[k])}`.slice(0,64) : '—';
 }
 function accountCols(){
+  /* Propensity and days-since come from the real score book, joined by
+     account_id. Contacts and open-opp count were dropped: every account has
+     exactly 3 contacts and exactly 1 open opp, so those columns carried no
+     information and read as synthetic padding. */
+  const sc = {};
+  if(S.scores) S.scores.scores.forEach(r=>{ sc[r.account_id]=r; });
+  const p1 = S.scores ? S.scores.p1_threshold : 0.7;
   return [
-    {key:'name', label:'Account', type:'text', w:'186px',
+    {key:'name', label:'Account', type:'text', w:'196px',
      render:r=>`<span class="cell-id">${sq(r.name)}<span class="nm">${esc(r.name)}</span></span>`},
-    {key:'domain', label:'Domain', type:'link', w:'152px',
+    {key:'domain', label:'Domain', type:'link', w:'158px',
      render:r=>`<span style="color:var(--brand-ink)">${esc(r.domain)}</span>`},
-    {key:'industry', label:'Industry', type:'enum', w:'170px', render:r=>chip(r.industry),
+    {key:'industry', label:'Industry', type:'enum', w:'188px', render:r=>chip(r.industry),
      foot:footUniq('industry')},
-    {key:'employee_band', label:'Employees', type:'enum', w:'114px',
+    {key:'employee_band', label:'Employees', type:'enum', w:'118px',
      render:r=>chip(r.employee_band, BAND_PAIR[r.employee_band])},
-    {key:'territory', label:'Territory', type:'enum', w:'120px',
+    {key:'territory', label:'Territory', type:'enum', w:'122px',
      render:r=>chip(r.territory, TERR_PAIR[r.territory]), foot:footUniq('territory')},
-    {key:'contacts', label:'Contacts', type:'num', align:'r', w:'86px', foot:footSum('contacts')},
-    {key:'activities_30d', label:'Acts 30d', type:'num', align:'r', w:'92px',
+    {key:'propensity', label:'Propensity', type:'num', align:'r', w:'112px',
+     sort:r=>(sc[r.id]?sc[r.id].score:-1),
+     render:r=>{ const x=sc[r.id];
+       return x ? `<b style="font-weight:600;color:${x.score>=p1?'var(--hot)':'var(--ink)'}">${x.score.toFixed(4)}</b>`
+                : '<span style="color:var(--ink-3)">—</span>'; },
+     foot:rows=>{ const v=rows.map(r=>sc[r.id]).filter(Boolean);
+       return v.length ? `<b>${v.filter(x=>x.score>=p1).length}</b> P1` : '—'; }},
+    {key:'activities_30d', label:'Acts 30d', type:'num', align:'r', w:'98px',
      render:r=>`<b style="font-weight:600">${r.activities_30d}</b><span style="color:var(--ink-3)"> / ${r.activities_total}</span>`,
      sort:r=>r.activities_30d, foot:footSum('activities_30d')},
-    {key:'opps_open', label:'Open', type:'num', align:'r', w:'70px', foot:footSum('opps_open')},
-    {key:'open_amount', label:'Open pipeline', type:'money', align:'r', w:'124px',
+    {key:'days_since', label:'Days since', type:'num', align:'r', w:'104px',
+     sort:r=>(sc[r.id]?sc[r.id].days_since_last_activity:1e9),
+     render:r=>{ const x=sc[r.id];
+       return x ? `${num(x.days_since_last_activity)}<span style="color:var(--ink-3)">d</span>`
+                : '<span style="color:var(--ink-3)">—</span>'; },
+     foot:rows=>{ const v=rows.map(r=>sc[r.id]).filter(Boolean);
+       return v.length ? `<b>avg</b> ${(v.reduce((a,x)=>a+x.days_since_last_activity,0)/v.length).toFixed(0)}d` : '—'; }},
+    {key:'open_amount', label:'Open pipeline', type:'money', align:'r', w:'128px',
      render:r=>r.open_amount?moneyK(r.open_amount):'<span style="color:var(--ink-3)">—</span>',
      foot:footMoney('open_amount')},
-    {key:'won_amount', label:'Won', type:'money', align:'r', w:'112px',
+    {key:'won_amount', label:'Won', type:'money', align:'r', w:'132px',
      render:r=>r.won_amount?`<span style="color:var(--ok)">${moneyK(r.won_amount)}</span>`:'<span style="color:var(--ink-3)">—</span>',
      foot:footMoney('won_amount')},
-    {key:'last_activity', label:'Last activity', type:'date', w:'118px',
-     render:r=>fmtDay(r.last_activity), sort:r=>r.last_activity},
   ];
 }
 
@@ -890,11 +1009,11 @@ function accountCols(){
 function bookView(v, title, sub, id, cols, rows, opts, hint){
   topbar(title, sub, [{label:'Export audit', icon:'i-dl', on:exportAudit}]);
   v.innerHTML='';
-  const h = el('div','phead');
-  h.innerHTML = `<h2>${esc(title)}</h2><div class="sp"></div>
-    <span class="pmeta">${esc(hint||'click a column header to sort')}</span>`;
-  v.appendChild(h);
-  const host = el('div'); v.appendChild(host);
+  /* Table pages scroll inside .tw so the sticky header has a scrolling
+     ancestor it belongs to; without this the thead scrolls away. */
+  v.classList.add('view-table');
+  const host = el('div'); host.style.cssText='flex:1;display:flex;flex-direction:column;min-height:0';
+  v.appendChild(host);
   renderTable(host, id, cols, rows, opts);
 }
 function vAccounts(v){
@@ -1064,7 +1183,8 @@ function vRoundRobin(v){
   v.appendChild(wrap);
 }
 function vTerritories(v){
-  topbar('Territory Management', `${S.stats.territories} territories · P1 threshold ${S.terr.p1_threshold} · SLA ${S.terr.sla_minutes} min`, []);
+  topbar('Territory Management',
+    `${S.stats.territories} territories · P1 at propensity ≥ ${S.terr.p1_threshold} · ${slaText()}`, []);
   v.innerHTML='';
   const rows = Object.entries(S.terr.territories).map(([name, reps])=>{
     const accs = S.accounts.filter(a=>a.territory===name);
@@ -1106,12 +1226,13 @@ function vTerritories(v){
 
   const rules = el('div'); rules.style.padding='18px';
   const cm = S.terr.country_map;
-  rules.innerHTML = `<div class="sec-h"><h3>ROUTING RULES</h3><div class="sp"></div>
+  rules.innerHTML = `<div class="sec-h"><h3>Routing rules</h3><div class="sp"></div>
     <span class="hint">the exact maps the router reads at decision time</span></div>`;
   const g = el('div','hl');
   [['Country map', Object.entries(cm).map(([k,vv])=>`${k} → ${vv}`).join('\n'), Object.keys(cm).length+' countries mapped'],
    ['US East states', S.terr.us_east_states.join('  '), S.terr.us_east_states.length+' states → AMER-East, rest → AMER-West'],
-   ['Thresholds', `P1 when propensity ≥ ${S.terr.p1_threshold}\nauto-match ≥ ${S.terr.match_auto}\nambiguous ≥ ${S.terr.match_ambiguous}\nSLA ${S.terr.sla_minutes} minutes`,
+   ['Thresholds', `P1 when propensity ≥ ${S.terr.p1_threshold}\nauto-match ≥ ${S.terr.match_auto}\nambiguous ≥ ${S.terr.match_ambiguous}\n`
+      + Object.entries(S.terr.sla_minutes).map(([k,v])=>`SLA ${k} ${v} minutes`).join('\n'),
     'default territory '+S.terr.default_territory],
   ].forEach(([k,bodyTxt,s])=>{
     const c = el('div','hlc');
@@ -1126,11 +1247,11 @@ function vTerritories(v){
 }
 function vModel(v){
   const m = S.stats.model;
-  topbar('Propensity v1', `logistic regression · holdout AUC ${m.holdout_auc.toFixed(4)} · ${m.n_features} features`, []);
+  topbar('Propensity v1', `logistic regression · holdout AUC ${fmtAuc()} · ${m.n_features} features`, []);
   v.innerHTML='';
   const wrap = el('div'); wrap.style.padding='16px 18px 26px';
   const kv = el('div','kv');
-  [['HOLDOUT AUC', m.holdout_auc.toFixed(4), 'ranking quality on held-out leads'],
+  [['HOLDOUT AUC', fmtAuc(), 'ranking quality on held-out leads'],
    ['FEATURES', m.n_features, 'all warehouse-derived'],
    ['TRAIN / TEST', `${m.n_train} / ${m.n_test}`, 'deterministic split, seed 42'],
    ['INTERCEPT', m.intercept.toFixed(4), 'log-odds at the feature mean'],
@@ -1141,7 +1262,7 @@ function vModel(v){
   wrap.appendChild(kv);
 
   const sec = el('div','sec');
-  sec.innerHTML = `<div class="sec-h"><h3>TRAINED COEFFICIENTS</h3><div class="sp"></div>
+  sec.innerHTML = `<div class="sec-h"><h3>Trained coefficients</h3><div class="sp"></div>
     <span class="hint">standardized weights read straight off the fitted model</span></div>`;
   const box = el('div'); box.style.cssText='border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:var(--bg);box-shadow:var(--shadow)';
   const co = Object.entries(m.coefficients).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
@@ -1161,13 +1282,52 @@ function vModel(v){
   if(S.stats.last_score && S.stats.last_score.explain){
     const ls = S.stats.last_score;
     const s2 = el('div','sec');
-    s2.innerHTML = `<div class="sec-h"><h3>MOST RECENT SCORE</h3>${chip(ls.lead_id,PAIR.brand)}
+    s2.innerHTML = `<div class="sec-h"><h3>Most recent score</h3>${chip(ls.lead_id,PAIR.brand)}
       <div class="sp"></div><span class="hint">${esc(fmtTime(ls.ts))}</span></div>`;
     const b2 = el('div'); b2.style.cssText='border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:var(--bg);box-shadow:var(--shadow)';
     b2.appendChild(contribBox(ls.explain, ls.score));
     s2.appendChild(b2); wrap.appendChild(s2);
   }
   v.appendChild(wrap);
+
+  /* The model applied to the whole book: every account scored by the real
+     fitted model at the frozen clock, with the feature vector behind each. */
+  const scores = S.scores ? S.scores.scores : [];
+  if(scores.length){
+    const p1 = S.scores.p1_threshold;
+    const h = el('div','phead');
+    h.innerHTML = `<h2>Propensity across the book</h2><div class="sp"></div>
+      <span class="pmeta">all ${num(scores.length)} accounts scored by propensity_v1 as of ${esc(fmtTime(S.scores.as_of))}</span>`;
+    v.appendChild(h);
+    const cols = [
+      {key:'account', label:'Account', type:'text', w:'190px',
+       render:r=>`<span class="cell-id">${sq(r.account)}<span class="nm">${esc(r.account)}</span></span>`},
+      {key:'score', label:'Propensity', type:'num', align:'r', w:'112px',
+       render:r=>`<b style="font-weight:600;color:${r.score>=p1?'var(--hot)':'var(--ink)'}">${r.score.toFixed(4)}</b>`,
+       foot:footAvg('score',4)},
+      {key:'band', label:'Rank', type:'num', w:'150px',
+       render:r=>`<span style="display:flex;align-items:center;gap:8px">
+          <span style="flex:1;height:6px;border-radius:3px;background:var(--bg-active);overflow:hidden">
+            <i style="display:block;height:100%;width:${(r.score*100).toFixed(1)}%;background:${r.score>=p1?'var(--hot)':'var(--brand)'}"></i></span></span>`,
+       sort:r=>r.score},
+      {key:'priority', label:'Priority', type:'enum', w:'96px',
+       render:r=>chip(r.score>=p1?'P1':'P2', r.score>=p1?PAIR.hot:PAIR.cool), sort:r=>r.score,
+       foot:rows=>`<b>${rows.filter(r=>r.score>=p1).length}</b> would be P1`},
+      {key:'activity_count_30d', label:'Acts 30d', type:'num', align:'r', w:'98px', foot:footAvg('activity_count_30d',1)},
+      {key:'distinct_contacts_engaged', label:'Engaged', type:'num', align:'r', w:'96px', foot:footAvg('distinct_contacts_engaged',1)},
+      {key:'days_since_last_activity', label:'Days since', type:'num', align:'r', w:'104px', foot:footAvg('days_since_last_activity',0)},
+      {key:'prior_opportunity_count', label:'Prior opps', type:'num', align:'r', w:'102px', foot:footSum('prior_opportunity_count')},
+      {key:'employee_band', label:'Employees', type:'enum', w:'116px',
+       render:r=>chip(r.employee_band, BAND_PAIR[r.employee_band])},
+      {key:'industry_fit', label:'Industry fit', type:'enum', w:'116px',
+       render:r=>chip(r.industry_fit?'IN ICP':'OFF-ICP', r.industry_fit?PAIR.ok:PAIR.mute), sort:r=>r.industry_fit,
+       foot:rows=>`<b>${rows.filter(r=>r.industry_fit).length}</b> in ICP`},
+      {key:'territory', label:'Territory', type:'enum', w:'120px',
+       render:r=>chip(r.territory, TERR_PAIR[r.territory]), foot:footUniq('territory')},
+    ];
+    const host = el('div'); v.appendChild(host);
+    renderTable(host,'scorebook',cols,scores,{unit:'accounts', sortKey:'score', sortDir:'desc'});
+  }
 }
 
 /* =========================================================================
@@ -1187,8 +1347,8 @@ function vLead(v, token){
   const applied = run.status==='applied' || !!stg('assignment_applied');
   const rejected = run.status==='rejected' || !!stg('rejected');
 
-  topbar(lead.company||run.lead_id,
-    `${run.lead_id} · ${(run.stages||[]).length} stages · ${(run.records||[]).length} audit records written by this run`,
+  topbar('Routing Queue › '+run.lead_id,
+    `${(run.stages||[]).length} stages · ${(run.records||[]).length} audit records written by this run`,
     [{label:'Back to overview', icon:'i-back', on:()=>{ location.hash='#/overview'; }},
      {label:'Export audit', icon:'i-dl', on:exportAudit}]);
 
@@ -1232,35 +1392,64 @@ function vLead(v, token){
     ['i-link','Domain', `<span style="color:var(--brand-ink)">${esc(acct.domain)}</span>`],
     ['i-tag','Industry', chip(acct.industry)],
     ['i-users','Employees', chip(acct.employee_band, BAND_PAIR[acct.employee_band])],
-    ['i-map','Territory', chip(acct.territory, TERR_PAIR[acct.territory])],
-    ['i-target','Confidence', mS?`<span class="num" style="font-weight:600">${mS.decision.score}</span><span style="color:var(--ink-3);font-size:11px"> / 100</span>`:null],
+    ['i-map','Account territory', chip(acct.territory, TERR_PAIR[acct.territory])],
     ['i-shield','Match rule', `<span class="mono" style="font-size:11px">${esc(mS?mS.rule_fired:'—')}</span>`],
-    ['i-rr','Tie-break', tS?`<span class="mono" style="font-size:11px">${esc(tS.rule_fired)}</span>`:'<span class="none">not needed</span>'],
+    ['i-rr','Tie-break', tS?`<span class="mono" style="font-size:10.5px" title="${esc(tS.rule_fired)}">${esc(tS.rule_fired)}</span>`:'<span class="none">not needed</span>'],
   ]);
   if(rS) grp('ROUTING DECISION', [
     ['i-user','Owner', `<span style="font-weight:550">${esc(rS.decision.rep)}</span>`],
-    ['i-map','Territory', chip(rS.decision.territory, TERR_PAIR[rS.decision.territory])],
-    ['i-bolt','Priority', chip(rS.decision.priority, rS.decision.priority==='P1'?PAIR.hot:PAIR.cool)],
-    ['i-clock','SLA', `<span class="num">${rS.decision.sla_minutes}</span> <span style="color:var(--ink-3);font-size:11px">minutes</span>`],
-    ['i-chart','Propensity', sS?`<span class="num" style="font-weight:600">${sS.decision.propensity_score}</span>`:null],
+    ['i-map','Routed territory', chip(rS.decision.territory, TERR_PAIR[rS.decision.territory])],
+    ['i-rr','Rotation', `<span class="mono" style="font-size:11px">${esc(rS.rule_fired)}</span>`],
     ['i-skip','Skipped', kS?chip(kS.decision.skipped_rep+' · '+kS.decision.reason.replace(/_/g,' '), PAIR.bad):'<span class="none">none</span>'],
     ['i-shield','Status', applied?chip('ASSIGNMENT APPLIED',PAIR.ok):rejected?chip('REJECTED',PAIR.bad):chip('PENDING APPROVAL',PAIR.warn)],
   ]);
-  if(ctx){
-    const t = ctx.totals;
-    const openAmt = ctx.open_opportunities.reduce((a,o)=>a+o.amount,0);
-    const lastAct = ctx.recent_activities[0];
-    grp('ACCOUNT SIGNALS', [
-      ['i-act','Activity 30d', `<span class="num" style="font-weight:600">${t.activities_30d}</span>
-        <span style="color:var(--ink-3);font-size:11px"> of ${t.activities_total} all time</span>`],
-      ['i-users','Engaged', `<span class="num" style="font-weight:600">${t.contacts_engaged_30d}</span>
-        <span style="color:var(--ink-3);font-size:11px"> of ${ctx.contacts.length} contacts</span>`],
-      ['i-clock','Last touch', lastAct?`${esc(titleize(lastAct.type))} <span style="color:var(--ink-3);font-size:11px">· ${esc(ago(lastAct.ts, ctx.as_of))}</span>`:null],
-      ['i-case','Opportunities', `<span class="num">${t.opps_total}</span>
-        <span style="color:var(--ink-3);font-size:11px"> · </span><span style="color:var(--ok)">${t.opps_won}W</span>
-        <span style="color:var(--ink-3);font-size:11px">/</span><span style="color:var(--bad)">${t.opps_lost}L</span>`],
-      ['i-cash','Open pipeline', openAmt?`<span class="num" style="font-weight:600">${money(openAmt)}</span>`:'<span class="none">none open</span>'],
-    ]);
+  const block = (title, node)=>{
+    const g = el('div','grp');
+    g.innerHTML = `<div class="grp-h">${esc(title)}</div>`;
+    g.appendChild(node); rail.appendChild(g);
+  };
+  if(lead.notes){
+    const n = el('div','note');
+    n.innerHTML = `<p>${esc(lead.notes)}</p>`;
+    block('INBOUND NOTE', n);
+  }
+  if(ctx && ctx.contacts.length){
+    const list = el('div');
+    ctx.contacts.forEach(c=>{
+      const [bg,fg] = tintOf(c.name);
+      const r = el('div','prow');
+      r.innerHTML = `<span class="av" style="background:${bg};color:${fg}">${esc(initials(c.name))}</span>
+        <span class="pt"><span class="pn">${esc(c.name)}</span>
+        <span class="ps">${esc(c.title)}</span>
+        <span class="ps" style="color:var(--brand-ink)">${esc(c.email)}</span></span>`;
+      list.appendChild(r);
+    });
+    block(`KNOWN CONTACTS · ${ctx.contacts.length}`, list);
+  }
+  if(ctx && ctx.open_opportunities.length){
+    const list = el('div');
+    ctx.open_opportunities.forEach(o=>{
+      const r = el('div','prow');
+      r.innerHTML = `<span class="av" style="background:var(--cool-t);color:var(--cool)">${ico('i-case')}</span>
+        <span class="pt"><span class="pn">${esc(money(o.amount))}</span>
+        <span class="ps">${esc(o.stage)} · opened ${esc(fmtDate(o.created_at))}</span>
+        <span class="ps">${num(daysBefore(o.created_at, ctx.as_of))} days open at the scoring clock</span></span>`;
+      list.appendChild(r);
+    });
+    block('OPEN OPPORTUNITIES', list);
+  }
+  if(mS && mS.decision.status==='ambiguous' && (mS.decision.candidates||[]).length){
+    const list = el('div');
+    mS.decision.candidates.forEach(c=>{
+      const won = tS && tS.decision.account_id===c.account_id;
+      const [bg,fg] = tintOf(c.name);
+      const r = el('div','prow');
+      r.innerHTML = `<span class="av" style="background:${bg};color:${fg}">${esc(initials(c.name))}</span>
+        <span class="pt"><span class="pn">${esc(c.name)} ${won?chip('CHOSEN',PAIR.ok):''}</span>
+        <span class="ps">account #${c.account_id} · score ${c.score}</span></span>`;
+      list.appendChild(r);
+    });
+    block('MATCH CANDIDATES', list);
   }
   const runFb = (run.stages||[]).filter(x=>x.fallback_used);
   grp('THIS RUN', [
@@ -1332,7 +1521,7 @@ function leadOverview(pad, run, s, ctx, prop, applied, rejected){
   const hl = el('div','hl');
   const cards = [];
   if(sS) cards.push(['i-chart','Propensity', sS.decision.propensity_score.toFixed(4), '',
-      `${sS.rule_fired} · holdout AUC ${S.stats.model.holdout_auc.toFixed(3)}`]);
+      `${sS.rule_fired} · holdout AUC ${fmtAuc()}`]);
   if(rS) cards.push(['i-bolt','Priority', rS.decision.priority, `SLA ${rS.decision.sla_minutes}m`,
       `P1 threshold is propensity ≥ ${S.terr.p1_threshold}`]);
   if(mS) cards.push(['i-target','Match confidence', mS.decision.score, '/ 100',
@@ -1345,8 +1534,10 @@ function leadOverview(pad, run, s, ctx, prop, applied, rejected){
     cards.push(['i-case','Open pipeline', open?money(open):'—', open?ctx.open_opportunities.length+' opp':'',
       ctx.open_opportunities.length?ctx.open_opportunities.map(o=>o.stage).join(', ')
         :`${t.opps_won} won · ${t.opps_lost} lost historically`]);
-    cards.push(['i-shield','Win history', `${t.opps_won}–${t.opps_lost}`, 'W–L',
-      `${t.opps_total} opportunities on this account`]);
+    const openN = ctx.open_opportunities.length;
+    cards.push(['i-shield','Win history', `${t.opps_won}W · ${t.opps_lost}L`,
+      openN?`+ ${openN} open`:'',
+      `${t.opps_total} opportunities on this account, all time`]);
   }
   cards.forEach(([icn,l,val,unit,sub])=>{
     const c = el('div','hlc');
@@ -1356,14 +1547,34 @@ function leadOverview(pad, run, s, ctx, prop, applied, rejected){
     hl.appendChild(c);
   });
   const sec1 = el('div','sec');
-  sec1.innerHTML = `<div class="sec-h"><h3>HIGHLIGHTS</h3><div class="sp"></div>
+  sec1.innerHTML = `<div class="sec-h"><h3>Highlights</h3><div class="sp"></div>
     <span class="hint">every value read from this run's audit records</span></div>`;
   sec1.appendChild(hl);
   pad.appendChild(sec1);
 
+  /* Recent activity — real rows, and the only place on the Overview that
+     answers "what has actually happened on this account". */
+  if(ctx && ctx.recent_activities.length){
+    const secA = el('div','sec');
+    secA.innerHTML = `<div class="sec-h"><h3>Recent activity</h3><div class="sp"></div>
+      <span class="hint">${ctx.totals.activities_total} all time · cut at the scoring clock ${esc(fmtTime(ctx.as_of))}</span></div>`;
+    const feed = el('div','feed');
+    ctx.recent_activities.slice(0,5).forEach(a=>{
+      const r = el('div','fd');
+      const [bg,fg]=tintOf(a.contact);
+      r.innerHTML = `<span class="av" style="background:${bg};color:${fg}">${esc(initials(a.contact))}</span>
+        <span class="who">${esc(a.contact)}</span>
+        <span class="what">${chip(titleize(a.type))}</span>
+        <span class="when">${esc(fmtDay(a.ts))} · ${esc(ago(a.ts, ctx.as_of))}</span>`;
+      feed.appendChild(r);
+    });
+    secA.appendChild(feed);
+    pad.appendChild(secA);
+  }
+
   /* Decision trace flow */
   const sec2 = el('div','sec');
-  sec2.innerHTML = `<div class="sec-h"><h3>DECISION TRACE</h3><div class="sp"></div>
+  sec2.innerHTML = `<div class="sec-h"><h3>Decision trace</h3><div class="sp"></div>
     <span class="hint">drawn from this run, not a stored diagram</span></div>`;
   sec2.appendChild(flowCanvas(run, s));
   pad.appendChild(sec2);
@@ -1371,7 +1582,7 @@ function leadOverview(pad, run, s, ctx, prop, applied, rejected){
   /* Waterfall — sequential per-stage status */
   const fbCount = (run.stages||[]).filter(x=>x.fallback_used).length;
   const sec3 = el('div','sec');
-  sec3.innerHTML = `<div class="sec-h"><h3>STAGE WATERFALL</h3><div class="sp"></div>
+  sec3.innerHTML = `<div class="sec-h"><h3>Stage waterfall</h3><div class="sp"></div>
     <span class="hint">${fbCount} of ${(run.stages||[]).length} stages fell back to a deterministic rule</span></div>`;
   sec3.appendChild(waterfall(run));
   pad.appendChild(sec3);
@@ -1379,7 +1590,7 @@ function leadOverview(pad, run, s, ctx, prop, applied, rejected){
   /* Score contributions */
   if(run.score_explain && sS){
     const sec4 = el('div','sec');
-    sec4.innerHTML = `<div class="sec-h"><h3>WHY THIS SCORE</h3><div class="sp"></div>
+    sec4.innerHTML = `<div class="sec-h"><h3>Why this score</h3><div class="sp"></div>
       <span class="hint">coefficient × standardized feature — the terms the model actually summed</span></div>`;
     const box = el('div'); box.style.cssText='border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:var(--bg);box-shadow:var(--shadow)';
     box.appendChild(contribBox(run.score_explain, sS.decision.propensity_score));
@@ -1429,6 +1640,7 @@ function flowCanvas(run, s){
 
   const n0 = spine({shape:'pill', tone:'mute', tag:'INBOUND', t:run.lead_id, s:'data/inbound'});
   y += PITCH;
+  const annot = (from,to)=>edges.push({a:from,b:to,dir:'r',annot:true});
 
   const amb = !!(mS && mS.decision.status==='ambiguous');
   const n1 = spine({shape:'pent', tone: amb?'warn':'ok', tag:'MATCH',
@@ -1442,53 +1654,59 @@ function flowCanvas(run, s){
       edges.push({a:n1,b:nb,label:'No Match',tone:'bad',dir:'r'});
       const nt = branch({tone:'ok', tag:'TIE-BREAK', t:tS?tS.decision.account_name:'—',
                          s:tS?tS.rule_fired:'—'}, BR2);
-      edges.push({a:nb,b:nt,label:'Fallback',tone:'warn',dir:'r'});
+      edges.push({a:nb,b:nt,label:'Ambiguous',tone:'warn',dir:'r'});
     } else {
       const nb = branch({tone:'ok', t:mS.decision.account_name,
                          s:'account #'+mS.decision.account_id+' · confidence '+mS.decision.score});
-      edges.push({a:n1,b:nb,label:'Match',tone:'ok',dir:'r'});
+      annot(n1,nb);
     }
   }
   y += PITCH;
 
   const n2 = spine({tone:'cool', tag:'ENRICH', t:'Warehouse context', s:eS?eS.rule_fired:'—'});
-  edges.push({a:n1,b:n2,label:amb?'Resolved':'Next'});
+  edges.push({a:n1,b:n2,label:amb?'Resolved by tie-break':'Match',tone:'ok'});
   if(eS){
     const d=eS.decision;
     const nb = branch({tone:'cool', t:d.n_contacts+' contacts · '+d.n_recent_activities+' activities',
       s:d.industry+' · '+d.employee_band+' · '+d.territory});
-    edges.push({a:n2,b:nb,label:'Loaded',dir:'r'});
+    annot(n2,nb);
   }
   y += PITCH;
 
   const n3 = spine({shape:'dia', tone: iS&&iS.fallback_used?'warn':'ok', tag:'JUDGE', t:'LLM available?', s:''});
   n3.w = 216; n3.h = 68; n3.x = SPINE-108; n3.y = y-7;
-  edges.push({a:n2,b:n3,label:'Next'});
+  edges.push({a:n2,b:n3,label:'Context loaded'});
   if(iS){
     const fb = iS.fallback_used;
     const nb = branch({tone:fb?'warn':'ok', t:titleize(iS.decision.intent), s:iS.rule_fired});
-    edges.push({a:n3,b:nb,label:fb?'No Match':'Match',tone:fb?'bad':'ok',dir:'r'});
+    /* A real branch: 'No' takes the deterministic keyword path, 'Yes' the LLM. */
+    edges.push({a:n3,b:nb,label:fb?'No':'Yes',tone:fb?'warn':'ok',dir:'r'});
   }
   y += PITCH;
 
   const n4 = spine({tone:'brand', tag:'SCORE', t:'propensity_v1',
-                    s:'holdout AUC '+S.stats.model.holdout_auc.toFixed(3)});
-  edges.push({a:n3,b:n4,label:'Next'});
+                    s:'holdout AUC '+fmtAuc()});
+  edges.push({a:n3,b:n4,label:iS?titleize(iS.decision.intent):'Classified',
+              tone:iS&&iS.fallback_used?'warn':'ok'});
   if(sS){
     const top = run.score_explain ? run.score_explain[0] : null;
     const nb = branch({tone:'brand', t:String(sS.decision.propensity_score),
       s: top ? `${top.feature} ${top.contribution>=0?'+':''}${top.contribution}`
              : S.stats.model.n_features+' features'});
-    edges.push({a:n4,b:nb,label:'Scored',dir:'r'});
+    annot(n4,nb);
   }
   y += PITCH;
 
   const n5 = spine({shape:'dia', tone: kS?'warn':'ok', tag:'ROUTE', t:'Rep available?', s:''});
   n5.w = 216; n5.h = 68; n5.x = SPINE-108; n5.y = y-7;
-  edges.push({a:n4,b:n5,label:'Next'});
+  /* The scoring threshold is the condition that set priority, so the edge says so. */
+  edges.push({a:n4,b:n5,
+    label: sS ? (sS.decision.propensity_score>=S.terr.p1_threshold
+                  ? `P1 · score ≥ ${S.terr.p1_threshold}` : `P2 · score < ${S.terr.p1_threshold}`) : 'Scored',
+    tone: sS && sS.decision.propensity_score>=S.terr.p1_threshold ? 'hot' : undefined});
   if(kS){
     const nb = branch({tone:'bad', t:kS.decision.skipped_rep, s:kS.decision.reason.replace(/_/g,' ')});
-    edges.push({a:n5,b:nb,label:'No Match',tone:'bad',dir:'r'});
+    edges.push({a:n5,b:nb,label:'No',tone:'bad',dir:'r'});
   }
   y += PITCH;
 
@@ -1496,7 +1714,7 @@ function flowCanvas(run, s){
   if(rS){
     n6 = spine({tone:'ok', tag:'ASSIGN', t:rS.decision.rep,
       s:rS.decision.territory+' · '+rS.decision.priority+' · SLA '+rS.decision.sla_minutes+'m'});
-    edges.push({a:n5,b:n6,label:kS?'Round Robin again':'Match',tone:'ok'});
+    edges.push({a:n5,b:n6,label:kS?'Round Robin again':'Yes',tone:'ok'});
     y += PITCH;
   }
 
@@ -1505,7 +1723,7 @@ function flowCanvas(run, s){
   const n7 = spine({shape:'pill', tone: applied?'ok':rejected?'bad':'warn', tag:'HITL',
     t: applied?'Assignment applied':rejected?'Proposal rejected':'Awaiting human approval',
     s: applied?'written to the warehouse':rejected?'nothing written':'hitl_gate'});
-  if(n6) edges.push({a:n6,b:n7,label:'Next'});
+  if(n6) edges.push({a:n6,b:n7,label:'Assignment proposed'});
 
   /* Fit the canvas to what this run actually drew — a fixed width would leave
      a few hundred px of empty grid whenever a lead takes the short path. */
@@ -1519,7 +1737,7 @@ function flowCanvas(run, s){
     <span class="ttl">Lead to Account Routing · ${esc(run.lead_id)}</span>
     <span class="chip" style="background:var(--bg-active);color:var(--ink-2)">${nodes.length} nodes</span>
     <div class="sp"></div>
-    <span class="pmeta">${(run.records||[]).length} audit records written by this run</span>`;
+    <span class="pmeta">solid edges are the path taken · dashed are results</span>`;
   wrap.appendChild(bar);
   const scroll = el('div','canvas-scroll');
   const cv = el('div','canvas');
@@ -1539,8 +1757,9 @@ function flowCanvas(run, s){
     cv.appendChild(d);
   });
   edges.forEach(e=>{
-    const l = el('div','elbl'+(e.tone?' '+e.tone:''), e.label);
+    const l = el('div','elbl'+(e.tone?' '+e.tone:''), e.label||'');
     l.dataset.edge='1';
+    if(!e.label) l.style.display='none';
     cv.appendChild(l);
   });
   scroll.appendChild(cv); wrap.appendChild(scroll);
@@ -1564,7 +1783,9 @@ function drawEdges(){
       d=`M${x1} ${y1} L${x2} ${y2}`;
       mx=(x1+x2)/2; my=(y1+y2)/2;
     }
-    paths += `<path d="${d}" fill="none" stroke="#9A9AA4" stroke-width="1.4" marker-end="url(#ah)"/>`;
+    paths += e.annot
+      ? `<path d="${d}" fill="none" stroke="#C2C2CB" stroke-width="1.2" stroke-dasharray="3 3"/>`
+      : `<path d="${d}" fill="none" stroke="#9A9AA4" stroke-width="1.4" marker-end="url(#ah)"/>`;
     const lb = labels[i];
     if(lb){ lb.style.left=mx+'px'; lb.style.top=my+'px'; }
   });
@@ -1588,7 +1809,7 @@ function waterfall(run){
       <div>${gl}<span class="nm">${esc(titleize(s.stage))}</span></div>
       <div><span class="ru" title="${esc(s.rule_fired)}">${esc(s.rule_fired)}</span></div>
       <div>${src}</div>
-      <div><span class="out" title="${esc(auditSummary(s))}">${esc(auditSummary(s))}</span></div>`;
+      <div><span class="out" title="${esc(safe(auditSummary(s)))}">${esc(safe(auditSummary(s)))}</span></div>`;
     wf.appendChild(r);
   });
   return wf;
@@ -1608,7 +1829,7 @@ function leadActivity(pad, ctx){
   pad.appendChild(kv);
 
   const sec = el('div','sec');
-  sec.innerHTML = `<div class="sec-h"><h3>ACTIVITY FEED</h3><div class="sp"></div>
+  sec.innerHTML = `<div class="sec-h"><h3>Activity feed</h3><div class="sp"></div>
     <span class="hint">most recent ${ctx.recent_activities.length}, cut at the scoring clock ${esc(fmtTime(ctx.as_of))}</span></div>`;
   const feed = el('div','feed');
   ctx.recent_activities.forEach(a=>{
@@ -1624,7 +1845,7 @@ function leadActivity(pad, ctx){
 
   if(ctx.open_opportunities.length){
     const s2 = el('div','sec');
-    s2.innerHTML = `<div class="sec-h"><h3>OPEN OPPORTUNITIES</h3></div>`;
+    s2.innerHTML = `<div class="sec-h"><h3>Open opportunities</h3></div>`;
     const f2 = el('div','feed');
     ctx.open_opportunities.forEach(o=>{
       const r = el('div','fd');
@@ -1639,7 +1860,7 @@ function leadActivity(pad, ctx){
 }
 function leadPeople(pad, ctx, lead){
   const sec = el('div','sec');
-  sec.innerHTML = `<div class="sec-h"><h3>INBOUND CONTACT</h3></div>`;
+  sec.innerHTML = `<div class="sec-h"><h3>Inbound contact</h3></div>`;
   const f0 = el('div','feed');
   const r0 = el('div','fd');
   r0.innerHTML = `${sq(lead.contact_name,'av')}<span class="who">${esc(lead.contact_name)}</span>

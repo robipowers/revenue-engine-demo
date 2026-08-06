@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from revenue_engine import audit, config, matching, model, pipeline, routing, warehouse
-from revenue_engine.features import vectorize
+from revenue_engine.features import features_as_of, vectorize
 
 HOST = "127.0.0.1"
 PORT = 5210
@@ -321,6 +321,39 @@ def opportunities_book() -> dict:
     return {"opportunities": [dict(zip(cols, r)) for r in rows], "as_of": as_of}
 
 
+def score_book() -> dict:
+    """Every account scored by the REAL propensity model at the frozen demo
+    clock, with the feature vector and per-feature contributions behind each
+    score. Read-only: it computes, it never writes an audit record, because
+    nothing here is a routing decision.
+    """
+    payload = _model_payload()
+    con = warehouse.connect()
+    try:
+        as_of = warehouse.demo_as_of()
+        accounts = con.execute(
+            "SELECT id, name, industry, employee_band, territory FROM accounts ORDER BY name"
+        ).fetchall()
+        rows = []
+        for acct_id, name, industry, band, territory in accounts:
+            feats = features_as_of(con, acct_id, as_of)
+            rows.append({
+                "account_id": acct_id, "account": name, "industry": industry,
+                "employee_band": band, "territory": territory,
+                "score": round(model.score(feats, payload), 4),
+                **feats,
+            })
+    finally:
+        con.close()
+    rows.sort(key=lambda r: -r["score"])
+    return {
+        "scores": rows,
+        "as_of": as_of,
+        "p1_threshold": routing.P1_THRESHOLD,
+        "model": _model_meta(),
+    }
+
+
 def audit_book(runs_dir=None) -> dict:
     """The full append-only decision log for this runs_dir, newest first.
 
@@ -518,6 +551,8 @@ class RelayHandler(BaseHTTPRequestHandler):
             self._send_json(200, opportunities_book())
         elif path == "/api/audit":
             self._send_json(200, audit_book(self.runs_dir))
+        elif path == "/api/scores":
+            self._send_json(200, score_book())
         elif path == "/favicon.ico":
             self.send_response(204)
             self.send_header("Content-Length", "0")

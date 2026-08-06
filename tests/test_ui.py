@@ -269,3 +269,23 @@ def test_audit_book_is_the_log_verbatim_newest_first(server):
     # Every record carries the governance fields the table renders.
     assert all("stage" in r and "rule_fired" in r and "inputs_sha256" in r
                for r in records)
+
+
+def test_score_book_scores_every_account_with_the_real_model(server):
+    status, data = _get(server, "/api/scores")
+    assert status == 200
+    rows = data["scores"]
+    assert len(rows) == 40
+    # Sorted by score descending, every score a real probability.
+    assert [r["score"] for r in rows] == sorted((r["score"] for r in rows), reverse=True)
+    assert all(0.0 <= r["score"] <= 1.0 for r in rows)
+    # The full feature vector the model consumed is returned alongside each score.
+    for name in ("activity_count_30d", "distinct_contacts_engaged",
+                 "days_since_last_activity", "prior_opportunity_count",
+                 "employee_band", "industry_fit"):
+        assert all(name in r for r in rows), name
+    # Scoring is read-only: it must not append anything to the audit log.
+    _, before = _get(server, "/api/audit")
+    _get(server, "/api/scores")
+    _, after = _get(server, "/api/audit")
+    assert before["total"] == after["total"]
