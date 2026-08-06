@@ -235,25 +235,29 @@ def _generate(rng: random.Random):
                 }
             )
 
-            # Inject the pre-creation signal.
+            # Inject the pre-creation signal. Distributions deliberately
+            # OVERLAP (won and lost share a band of plausible activity) so a
+            # trained model lands at a credible holdout AUC rather than the
+            # fake-looking perfect separation of a toy dataset.
             roster = contacts_by_account[acct["id"]]
             if outcome == "won":
-                n_acts = rng.randint(10, 16)
-                engaged = roster  # all 3 contacts engaged
-            elif outcome == "open":
-                n_acts = rng.randint(5, 9)
+                n_acts = rng.randint(4, 13)
                 engaged = rng.sample(roster, rng.randint(2, 3))
-            else:  # lost: thin, single-threaded engagement
-                n_acts = rng.randint(1, 4)
-                engaged = rng.sample(roster, 1)
+            elif outcome == "open":
+                n_acts = rng.randint(3, 9)
+                engaged = rng.sample(roster, rng.randint(1, 3))
+            else:  # lost: thinner, more single-threaded engagement
+                n_acts = rng.randint(1, 8)
+                engaged = rng.sample(roster, rng.randint(1, 2))
             for _ in range(n_acts):
                 ts = created_at - timedelta(
                     days=rng.uniform(0.5, 29.5), hours=rng.uniform(0, 6)
                 )
                 add_activity(acct["id"], rng.choice(engaged), ts)
 
-    # Background noise spread across all accounts and the full timeline.
-    for _ in range(80):
+    # Background noise spread across all accounts and the full timeline
+    # (also blurs the pre-creation windows, which keeps AUC honest).
+    for _ in range(200):
         acct = rng.choice(accounts)
         ts = BASE_DATE + timedelta(days=rng.uniform(-10, 170), hours=rng.uniform(0, 23))
         add_activity(acct["id"], rng.choice(contacts_by_account[acct["id"]]), ts)
