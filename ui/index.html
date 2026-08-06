@@ -535,7 +535,17 @@ const PAIR = {
   mute:['var(--bg-active)','var(--ink-2)'],
 };
 const TERR_PAIR = {'AMER-East':TINTS[0],'AMER-West':TINTS[4],'EMEA':TINTS[5],'APAC':TINTS[6]};
-const BAND_PAIR = {'1-50':TINTS[8],'51-200':TINTS[1],'201-1000':TINTS[4],'1001-5000':TINTS[7],'5000+':TINTS[3]};
+/* Employee band is ordinal, so it gets one hue that deepens with size. */
+const BAND_PAIR = {
+  '1-50':      ['#F2F3F8','#5A6178'],
+  '51-200':    ['#E6E9F6','#454F7C'],
+  '201-1000':  ['#D8DEF3','#374282'],
+  '1001-5000': ['#C9D2EF','#2D388B'],
+  '5000+':     ['#BAC4EA','#242E93'],
+};
+/* Industry draws from hues that neither territory nor employee band use. */
+const INDUSTRY_TINTS = [TINTS[1],TINTS[2],TINTS[3],TINTS[7],TINTS[8],TINTS[9]];
+const industryPair = v => INDUSTRY_TINTS[hash(v)%INDUSTRY_TINTS.length];
 const STAGE_PAIR = {'Closed Won':PAIR.ok,'Closed Lost':PAIR.bad,'Negotiation':PAIR.hot,
                     'Evaluation':PAIR.warn,'Discovery':PAIR.cool};
 /* Audit stages get a tone that matches what the stage means operationally. */
@@ -721,6 +731,12 @@ function renderTable(host, id, cols, rows, opts){
       bar.appendChild(clr);
     }
     bar.appendChild(el('div','sp'));
+    if(opts.hint){
+      const hint = el('span','cnt');
+      hint.textContent = opts.hint;
+      bar.appendChild(hint);
+      bar.appendChild(el('span','cnt','·'));
+    }
     const sorted = el('span','cnt');
     sorted.textContent = `sorted by ${col.label||col.key} ${st.dir==='asc'?'ascending':'descending'}`;
     bar.appendChild(sorted);
@@ -974,7 +990,7 @@ function accountCols(){
      render:r=>`<span class="cell-id">${sq(r.name)}<span class="nm">${esc(r.name)}</span></span>`},
     {key:'domain', label:'Domain', type:'link', w:'158px',
      render:r=>`<span style="color:var(--brand-ink)">${esc(r.domain)}</span>`},
-    {key:'industry', label:'Industry', type:'enum', w:'188px', render:r=>chip(r.industry),
+    {key:'industry', label:'Industry', type:'enum', w:'188px', render:r=>chip(r.industry, industryPair(r.industry)),
      foot:footUniq('industry')},
     {key:'employee_band', label:'Employees', type:'enum', w:'118px',
      render:r=>chip(r.employee_band, BAND_PAIR[r.employee_band])},
@@ -1007,7 +1023,7 @@ function accountCols(){
 }
 
 /* ---------- book views ---------- */
-function bookView(v, title, sub, id, cols, rows, opts, hint){
+function bookView(v, title, sub, id, cols, rows, opts){
   topbar(title, sub, [{label:'Export audit', icon:'i-dl', on:exportAudit}]);
   v.innerHTML='';
   /* Table pages scroll inside .tw so the sticky header has a scrolling
@@ -1030,7 +1046,7 @@ function vContacts(v){
      render:r=>`<span style="font-weight:500">${esc(r.account)}</span>`, foot:footUniq('account')},
     {key:'email', label:'Email', type:'link', w:'252px',
      render:r=>`<span style="color:var(--brand-ink)">${esc(r.email)}</span>`},
-    {key:'industry', label:'Industry', type:'enum', w:'162px', render:r=>chip(r.industry)},
+    {key:'industry', label:'Industry', type:'enum', w:'162px', render:r=>chip(r.industry, industryPair(r.industry))},
     {key:'territory', label:'Territory', type:'enum', w:'120px',
      render:r=>chip(r.territory, TERR_PAIR[r.territory]), foot:footUniq('territory')},
     {key:'activities', label:'Activities', type:'num', align:'r', w:'98px', foot:footSum('activities')},
@@ -1048,22 +1064,24 @@ function vOpps(v){
     {key:'stage', label:'Stage', type:'enum', w:'136px', render:r=>chip(r.stage, STAGE_PAIR[r.stage])},
     {key:'amount', label:'Amount', type:'money', align:'r', w:'126px',
      render:r=>`<b style="font-weight:600">${money(r.amount)}</b>`, foot:footMoney('amount')},
-    {key:'outcome', label:'Outcome', type:'enum', w:'108px',
-     render:r=>r.outcome?chip(r.outcome.toUpperCase(), r.outcome==='won'?PAIR.ok:PAIR.bad):chip('OPEN',PAIR.cool),
-     sort:r=>r.outcome||'open',
-     foot:rows=>`<b>${rows.filter(r=>!r.outcome).length}</b> open`},
     {key:'territory', label:'Territory', type:'enum', w:'120px',
-     render:r=>chip(r.territory, TERR_PAIR[r.territory])},
-    {key:'industry', label:'Industry', type:'enum', w:'162px', render:r=>chip(r.industry)},
+     render:r=>chip(r.territory, TERR_PAIR[r.territory]), foot:footUniq('territory')},
+    {key:'industry', label:'Industry', type:'enum', w:'162px', render:r=>chip(r.industry, industryPair(r.industry))},
     {key:'created_at', label:'Created', type:'date', w:'118px',
      render:r=>fmtDay(r.created_at), sort:r=>r.created_at},
-    {key:'age_days', label:'Age', type:'num', align:'r', w:'88px',
-     render:r=>`${num(r.age_days)}<span style="color:var(--ink-3)">d</span>`, foot:footAvg('age_days',0)},
+    {key:'closed_at', label:'Closed', type:'date', w:'118px',
+     render:r=>r.closed_at?fmtDay(r.closed_at):'<span style="color:var(--ink-3)">still open</span>',
+     sort:r=>r.closed_at,
+     foot:rows=>`<b>${rows.filter(r=>!r.closed_at).length}</b> still open`},
+    {key:'age_days', label:'Days to close', type:'num', align:'r', w:'116px',
+     render:r=>`${num(r.age_days)}<span style="color:var(--ink-3)">d</span>`,
+     foot:footAvg('age_days',0)},
   ];
   const open = S.opps.filter(o=>!o.outcome).reduce((a,o)=>a+o.amount,0);
   bookView(v,'Opportunities',
     `${S.opps.length} opportunities · ${money(sum(S.opps,'amount'))} lifetime · ${money(open)} open`,
-    'opps', cols, S.opps, {unit:'opportunities', sortKey:'amount', sortDir:'desc'});
+    'opps', cols, S.opps, {unit:'opportunities', sortKey:'amount', sortDir:'desc',
+     hint:'days to close runs to closed_at, or to the frozen clock while still open'});
 }
 function vAudit(v){
   topbar('Audit Log', `${num(S.audit.total)} append-only records · ${num(S.audit.fallbacks)} fallbacks`,
@@ -1453,7 +1471,7 @@ function vLead(v, token){
     ['i-bld','Account', `<span style="font-weight:550">${esc(acct.name)}</span>`],
     ['i-hash','Account ID', `<span class="mono">#${acct.id}</span>`],
     ['i-link','Domain', `<span style="color:var(--brand-ink)">${esc(acct.domain)}</span>`],
-    ['i-tag','Industry', chip(acct.industry)],
+    ['i-tag','Industry', chip(acct.industry, industryPair(acct.industry))],
     ['i-users','Employees', chip(acct.employee_band, BAND_PAIR[acct.employee_band])],
     ['i-map','Account territory', chip(acct.territory, TERR_PAIR[acct.territory])],
     ['i-shield','Match rule', `<span class="mono" style="font-size:11px">${esc(mS?mS.rule_fired:'—')}</span>`],
