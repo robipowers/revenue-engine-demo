@@ -630,7 +630,9 @@ async function decide(decision){
 const NAV = [
   {sec:'ROUTING', items:[
     {id:'overview', label:'Overview', icon:'i-flow'},
-    {id:'queue',    label:'Routing Queue', icon:'i-inbox', badge:()=>S.leads.length},
+    {id:'queue',    label:'Routing Queue', icon:'i-inbox',
+     badge:()=>S.leads.filter(l=>{ const o=leadOutcome(l.lead_id);
+       return !o.status || o.status==='pending' || o.status==='review'; }).length},
     {id:'insights', label:'Routing Insights', icon:'i-chart', count:()=>Object.keys(repRoster()).length},
     {id:'audit',    label:'Audit Log', icon:'i-log', count:()=>S.audit.total},
     {id:'rr',       label:'Round Robin', icon:'i-rr', count:()=>S.stats.reps},
@@ -890,11 +892,15 @@ function vOverview(v){
 
   const R = el('div','pane-r');
   const rh = el('div','phead');
-  rh.innerHTML = `<h2>Routing Queue</h2><div class="sp"></div><span class="pmeta">${S.leads.length} awaiting</span>`;
+  const pending = S.leads.filter(l=>{ const o=leadOutcome(l.lead_id);
+    return !o.status || o.status==='pending' || o.status==='review'; }).length;
+  rh.innerHTML = `<h2>Routing Queue</h2><div class="sp"></div>
+    <span class="pmeta">${pending} of ${S.leads.length} awaiting a decision</span>`;
   R.appendChild(rh);
   const qw = el('div','qwrap');
   S.leads.forEach(ld=>{
     const c = el('div','qcard');
+    const o = leadOutcome(ld.lead_id);
     const loc = [ld.state, ld.country].filter(Boolean).join(', ');
     c.innerHTML = `
       <div class="qtop">${sq(ld.company)}<span class="qco">${esc(ld.company)}</span>
@@ -903,7 +909,9 @@ function vOverview(v){
       <div class="qrow"><span class="k">Title</span><span class="v">${esc(ld.title)}</span></div>
       <div class="qrow"><span class="k">Region</span><span class="v">${esc(loc)}</span></div>
       <div class="qnote">${esc(ld.notes)}</div>
-      <div class="qcta">${ico('i-play')}<span>Run routing</span></div>`;
+      <div class="qcta">${ico('i-play')}<span>${o.status?'Re-run routing':'Run routing'}</span>
+        ${o.status?`<span style="margin-left:auto;font-weight:500">${chip(o.status.toUpperCase(), OUT_PAIR[o.status])}
+          ${o.rep?`<span style="color:var(--ink-3)"> ${esc(o.rep)}</span>`:''}</span>`:''}</div>`;
     c.onclick = ()=>runLead(ld.file, true);
     qw.appendChild(c);
   });
@@ -1737,7 +1745,7 @@ function leadOverview(pad, run, s, ctx, prop, applied, rejected){
   const sec2 = el('div','sec');
   sec2.innerHTML = `<div class="sec-h"><h3>Decision trace</h3><div class="sp"></div>
     <span class="hint">drawn from this run, not a stored diagram</span></div>`;
-  sec2.appendChild(flowCanvas(run, s));
+  sec2.appendChild(flowCanvas(run, s, ctx));
   pad.appendChild(sec2);
 
   /* Waterfall — sequential per-stage status */
@@ -1800,7 +1808,7 @@ let FLOW = null;
    node is a branch the flow defines but this record did not take; those ghosts
    show the configured RULE or THRESHOLD, never invented data. Result cards
    hang off thin dotted connectors and carry no label. */
-function flowCanvas(run, st){
+function flowCanvas(run, st, ctx){
   const {mS,tS,eS,iS,sS,kS,rS} = st;
   const nodes = [], edges = [];
   const L = 84, SPINE = 338, R = 574, R2 = 750;
@@ -1839,9 +1847,14 @@ function flowCanvas(run, st){
         s:'ambiguous ≥ '+th.match_ambiguous+' · '+(mS.decision.candidates||[]).map(c=>c.name).join(' · ')});
       flow(nMatch, nc, 'Ambiguous', 'warn');
       edges[edges.length-1].dir = 'r';
-      const nt = add({x:R-RW/2, y:y+1+66, w:RW, h:RH, shape:'rect', tone:'ok', tag:'TIE-BREAK',
-        t:tS?tS.decision.account_name:'—', s:tS?tS.rule_fired:'—'});
-      flow(nc, nt, 'Highest score', 'ok');
+      const cs = mS.decision.candidates||[];
+      const tied = cs.length>1 && cs.every(c=>c.score===cs[0].score);
+      const nt = add({x:R-RW/2, y:y+1+92, w:RW, h:56, shape:'rect', tone:'ok', tag:'TIE-BREAK',
+        t:tS?tS.decision.account_name:'—',
+        /* say what actually broke it: equal scores fall through to account_id */
+        s: tied ? `tied at ${cs[0].score} → lowest account id`
+                : `highest score of ${cs.length}`});
+      flow(nc, nt, tied ? 'Tied' : 'Highest score', 'ok');
       notTaken(nMatch, ghost({t:'Exact domain match', s:'auto-match ≥ '+th.match_auto}), 'Match');
     } else if(status==='matched'){
       note(nMatch, result({tone:'ok', t:mS.decision.account_name,
@@ -1853,7 +1866,7 @@ function flowCanvas(run, st){
       notTaken(nMatch, ghost({t:'Exact domain match', s:'auto-match ≥ '+th.match_auto}), 'Match');
     }
   }
-  y += PITCH + (amb ? 70 : 6);
+  y += PITCH + (amb ? 100 : 6);
 
   /* 3 — enrich (only if the record has one) */
   let prev = nMatch;
@@ -1861,7 +1874,8 @@ function flowCanvas(run, st){
     const d = eS.decision;
     const nEn = spine({tone:'cool', tag:'ENRICH', t:'Warehouse context', s:eS.rule_fired});
     flow(prev, nEn, matchExit, status==='matched'||amb ? 'ok' : 'bad');
-    note(nEn, result({tone:'cool', t:d.n_contacts+' contacts · '+d.n_recent_activities+' activities',
+    const total = ctx && ctx.totals ? ctx.totals.activities_total : d.n_recent_activities;
+    note(nEn, result({tone:'cool', t:d.n_contacts+' contacts · '+total+' activities',
       s:d.industry+' · '+d.employee_band+' · '+d.territory}));
     prev = nEn; y += PITCH;
   }
