@@ -89,7 +89,8 @@ svg{display:block}
 /* ---------- chips ---------- */
 .chip{
   display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;
-  padding:2px 7px;border-radius:4px;line-height:1.35;white-space:nowrap;letter-spacing:.005em
+  padding:2px 7px;border-radius:4px;line-height:1.35;white-space:nowrap;letter-spacing:.005em;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis
 }
 .chip.dot::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex:none;opacity:.85}
 .chip-live{background:var(--ok-t);color:var(--ok);font-weight:650;letter-spacing:.05em}
@@ -223,7 +224,7 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 }
 .attr{display:flex;align-items:center;gap:9px;min-height:31px;padding:3px 16px}
 .attr:hover{background:var(--bg-hover)}
-.attr-k{display:flex;align-items:center;gap:7px;width:136px;flex:none;color:var(--ink-2);font-size:12.5px}
+.attr-k{display:flex;align-items:center;gap:7px;width:128px;flex:none;color:var(--ink-2);font-size:12.5px}
 .attr-k svg{width:12.5px;height:12.5px;opacity:.5;flex:none}
 .attr-k span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .attr-v{font-size:12.5px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
@@ -304,6 +305,9 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 .elbl.ok{color:var(--ok);border-color:#CDE9DC}
 .elbl.bad{color:var(--bad);border-color:#F5D3DA}
 .elbl.warn{color:var(--warn);border-color:#F0DFC0}
+.elbl.gh{color:var(--ink-3);border-style:dashed;background:#FCFCFD;font-weight:500}
+.nd.ghost{opacity:.72}
+.nd.ghost .nd-t{font-weight:500}
 
 /* ---------- waterfall ---------- */
 .wf{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--line)}
@@ -431,7 +435,7 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
     <div class="nav-foot">
       <span class="dot-live"></span>
       <div class="nav-foot-t">Engine live<br><span id="navClock">—</span><br>
-        <span style="opacity:.8">decision clock is live</span></div>
+        <span style="opacity:.8">decisions stamped in real time</span></div>
     </div>
   </aside>
   <main class="main">
@@ -534,7 +538,14 @@ const PAIR = {
   cool:['var(--cool-t)','var(--cool)'], brand:['var(--brand-tint)','var(--brand-ink)'],
   mute:['var(--bg-active)','var(--ink-2)'],
 };
-const TERR_PAIR = {'AMER-East':TINTS[0],'AMER-West':TINTS[4],'EMEA':TINTS[5],'APAC':TINTS[6]};
+/* East vs West is the enum that drives rep assignment, so the two must be
+   separable at a glance; TINTS[0] and TINTS[4] were both pale blue. */
+const TERR_PAIR = {
+  'AMER-East':['#EEF0FF','#3730A3'],   // indigo
+  'AMER-West':['#FFF0E8','#C2410C'],   // orange
+  'EMEA':     ['#F3ECFB','#6D28D9'],   // violet
+  'APAC':     ['#E6F4F6','#0E7490'],   // teal
+};
 /* Employee band is ordinal, so it gets one hue that deepens with size. */
 const BAND_PAIR = {
   '1-50':      ['#F2F3F8','#5A6178'],
@@ -574,7 +585,7 @@ async function boot(){
   ]);
   S.stats=stats; S.leads=leads.leads; S.accounts=acc.accounts; S.contacts=con.contacts;
   S.opps=opp.opportunities; S.audit=aud; S.desk=desk; S.terr=terr; S.scores=sco;
-  $('#navClock').textContent = 'as of '+fmtTime(stats.as_of);
+  $('#navClock').textContent = 'scoring clock '+fmtTime(stats.as_of);
   renderNav();
 
   const demo = new URLSearchParams(location.search).get('demo');
@@ -840,7 +851,7 @@ function vOverview(v){
   const openAmt = S.opps.filter(o=>o.outcome==null).reduce((a,o)=>a+o.amount,0);
   const fbRate = S.audit.total ? (S.audit.fallbacks/S.audit.total*100) : 0;
   topbar('Routing Overview',
-    `${num(S.audit.total)} decisions recorded live · scored against the frozen warehouse of ${fmtTime(st.as_of)}`,
+    `${num(S.audit.total)} decisions recorded live · features frozen at the scoring clock ${fmtTime(st.as_of)}`,
     [{label:'Export audit', icon:'i-dl', on:exportAudit},
      {label:'Run next lead', icon:'i-play', primary:true, on:()=>S.leads.length&&runLead(S.leads[0].file, true)}]);
 
@@ -902,7 +913,9 @@ function vOverview(v){
 }
 function deskList(){
   const d = el('div','desk');
-  const reps = Object.values(repRoster()).sort((a,b)=>(b.routed+b.skipped)-(a.routed+a.skipped));
+  /* Rank by work actually done; skips are shown but never promote a rep. */
+  const reps = Object.values(repRoster())
+    .sort((a,b)=>(b.applied+b.routed)-(a.applied+a.routed) || b.skipped-a.skipped);
   const max = Math.max(1, ...reps.map(r=>r.routed+r.skipped));
   reps.forEach(r=>{
     const row = el('div','drow');
@@ -986,37 +999,37 @@ function accountCols(){
   if(S.scores) S.scores.scores.forEach(r=>{ sc[r.account_id]=r; });
   const p1 = S.scores ? S.scores.p1_threshold : 0.7;
   return [
-    {key:'name', label:'Account', type:'text', w:'196px',
+    {key:'name', label:'Account', type:'text', w:'184px',
      render:r=>`<span class="cell-id">${sq(r.name)}<span class="nm">${esc(r.name)}</span></span>`},
-    {key:'domain', label:'Domain', type:'link', w:'158px',
+    {key:'domain', label:'Domain', type:'link', w:'104px',
      render:r=>`<span style="color:var(--brand-ink)">${esc(r.domain)}</span>`},
-    {key:'industry', label:'Industry', type:'enum', w:'188px', render:r=>chip(r.industry, industryPair(r.industry)),
+    {key:'industry', label:'Industry', type:'enum', w:'168px', render:r=>chip(r.industry, industryPair(r.industry)),
      foot:footUniq('industry')},
-    {key:'employee_band', label:'Employees', type:'enum', w:'118px',
+    {key:'employee_band', label:'Employees', type:'enum', w:'108px',
      render:r=>chip(r.employee_band, BAND_PAIR[r.employee_band])},
-    {key:'territory', label:'Territory', type:'enum', w:'122px',
+    {key:'territory', label:'Territory', type:'enum', w:'112px',
      render:r=>chip(r.territory, TERR_PAIR[r.territory]), foot:footUniq('territory')},
-    {key:'propensity', label:'Propensity', type:'num', align:'r', w:'112px',
+    {key:'propensity', label:'Propensity', type:'num', align:'r', w:'102px',
      sort:r=>(sc[r.id]?sc[r.id].score:-1),
      render:r=>{ const x=sc[r.id];
        return x ? `<b style="font-weight:600;color:${x.score>=p1?'var(--hot)':'var(--ink)'}">${x.score.toFixed(4)}</b>`
                 : '<span style="color:var(--ink-3)">—</span>'; },
      foot:rows=>{ const v=rows.map(r=>sc[r.id]).filter(Boolean);
        return v.length ? `<b>${v.filter(x=>x.score>=p1).length}</b> P1` : '—'; }},
-    {key:'activities_30d', label:'Acts 30d', type:'num', align:'r', w:'98px',
+    {key:'activities_30d', label:'Acts 30d', type:'num', align:'r', w:'90px',
      render:r=>`<b style="font-weight:600">${r.activities_30d}</b><span style="color:var(--ink-3)"> / ${r.activities_total}</span>`,
      sort:r=>r.activities_30d, foot:footSum('activities_30d')},
-    {key:'days_since', label:'Days since', type:'num', align:'r', w:'104px',
+    {key:'days_since', label:'Days since', type:'num', align:'r', w:'92px',
      sort:r=>(sc[r.id]?sc[r.id].days_since_last_activity:1e9),
      render:r=>{ const x=sc[r.id];
        return x ? `${num(x.days_since_last_activity)}<span style="color:var(--ink-3)">d</span>`
                 : '<span style="color:var(--ink-3)">—</span>'; },
      foot:rows=>{ const v=rows.map(r=>sc[r.id]).filter(Boolean);
        return v.length ? `<b>avg</b> ${(v.reduce((a,x)=>a+x.days_since_last_activity,0)/v.length).toFixed(0)}d` : '—'; }},
-    {key:'open_amount', label:'Open pipeline', type:'money', align:'r', w:'128px',
+    {key:'open_amount', label:'Open pipeline', type:'money', align:'r', w:'114px',
      render:r=>r.open_amount?moneyK(r.open_amount):'<span style="color:var(--ink-3)">—</span>',
      foot:footMoney('open_amount')},
-    {key:'won_amount', label:'Won', type:'money', align:'r', w:'132px',
+    {key:'won_amount', label:'Won', type:'money', align:'r', w:'126px',
      render:r=>r.won_amount?`<span style="color:var(--ok)">${moneyK(r.won_amount)}</span>`:'<span style="color:var(--ink-3)">—</span>',
      foot:footMoney('won_amount')},
   ];
@@ -1034,7 +1047,7 @@ function bookView(v, title, sub, id, cols, rows, opts){
   renderTable(host, id, cols, rows, opts);
 }
 function vAccounts(v){
-  bookView(v,'Accounts',`${S.accounts.length} accounts in the warehouse · rollups as of ${fmtTime(S.stats.as_of)}`,
+  bookView(v,'Accounts',`${S.accounts.length} accounts · 30-day windows measured at the scoring clock ${fmtTime(S.stats.as_of)}`,
     'accounts', accountCols(), S.accounts, {unit:'accounts', sortKey:'open_amount', sortDir:'desc'});
 }
 function vContacts(v){
@@ -1049,12 +1062,14 @@ function vContacts(v){
     {key:'industry', label:'Industry', type:'enum', w:'162px', render:r=>chip(r.industry, industryPair(r.industry))},
     {key:'territory', label:'Territory', type:'enum', w:'120px',
      render:r=>chip(r.territory, TERR_PAIR[r.territory]), foot:footUniq('territory')},
-    {key:'activities', label:'Activities', type:'num', align:'r', w:'98px', foot:footSum('activities')},
+    {key:'activities', label:'Acts to clock', type:'num', align:'r', w:'116px', foot:footSum('activities')},
     {key:'last_activity', label:'Last seen', type:'date', w:'118px',
      render:r=>fmtDay(r.last_activity), sort:r=>r.last_activity},
   ];
-  bookView(v,'Contacts',`${S.contacts.length} contacts joined to ${new Set(S.contacts.map(c=>c.account)).size} accounts`,
-    'contacts', cols, S.contacts, {unit:'contacts', sortKey:'activities', sortDir:'desc'});
+  const toClock = sum(S.contacts,'activities'), allTime = S.stats.warehouse.activities;
+  bookView(v,'Contacts',`${S.contacts.length} contacts across ${new Set(S.contacts.map(c=>c.account)).size} accounts`,
+    'contacts', cols, S.contacts, {unit:'contacts', sortKey:'activities', sortDir:'desc',
+     hint:`${num(toClock)} of ${num(allTime)} activities fall on or before the scoring clock`});
 }
 function vOpps(v){
   const cols = [
@@ -1069,9 +1084,18 @@ function vOpps(v){
     {key:'industry', label:'Industry', type:'enum', w:'162px', render:r=>chip(r.industry, industryPair(r.industry))},
     {key:'created_at', label:'Created', type:'date', w:'118px',
      render:r=>fmtDay(r.created_at), sort:r=>r.created_at},
-    {key:'closed_at', label:'Closed', type:'date', w:'118px',
-     render:r=>r.closed_at?fmtDay(r.closed_at):'<span style="color:var(--ink-3)">still open</span>',
+    {key:'closed_at', label:'Closed', type:'date', w:'146px',
      sort:r=>r.closed_at,
+     render:r=>{
+       if(!r.closed_at) return '<span style="color:var(--ink-3)">still open</span>';
+       /* A close after the scoring clock is expected: the clock freezes what
+          the MODEL may see, it does not truncate the warehouse. Marking these
+          rows makes the leakage guard visible instead of looking like a bug. */
+       const after = parseTs(r.closed_at) > parseTs(S.stats.as_of);
+       return fmtDay(r.closed_at) + (after
+         ? ` <span class="chip" style="background:var(--bg-active);color:var(--ink-3)" title="closed after the scoring clock — outside what the model was allowed to see">post-clock</span>`
+         : '');
+     },
      foot:rows=>`<b>${rows.filter(r=>!r.closed_at).length}</b> still open`},
     {key:'age_days', label:'Days to close', type:'num', align:'r', w:'116px',
      render:r=>`${num(r.age_days)}<span style="color:var(--ink-3)">d</span>`,
@@ -1081,7 +1105,7 @@ function vOpps(v){
   bookView(v,'Opportunities',
     `${S.opps.length} opportunities · ${money(sum(S.opps,'amount'))} lifetime · ${money(open)} open`,
     'opps', cols, S.opps, {unit:'opportunities', sortKey:'amount', sortDir:'desc',
-     hint:'days to close runs to closed_at, or to the frozen clock while still open'});
+     hint:'post-clock closes are outside the model\u2019s view by design'});
 }
 function vAudit(v){
   topbar('Audit Log', `${num(S.audit.total)} append-only records · ${num(S.audit.fallbacks)} fallbacks`,
@@ -1134,35 +1158,34 @@ function vQueue(v){
   topbar('Routing Queue', `${S.leads.length} inbound leads awaiting a routing decision`, []);
   v.innerHTML='';
   const cols = [
-    {key:'company', label:'Company', type:'text', w:'190px',
+    {key:'company', label:'Company', type:'text', w:'176px',
      render:r=>`<span class="cell-id">${sq(r.company)}<span class="nm">${esc(r.company)}</span></span>`},
-    {key:'lead_id', label:'Lead ID', type:'mono', w:'96px', render:r=>`<span class="mono">${esc(r.lead_id)}</span>`},
-    {key:'contact_name', label:'Contact', type:'person', w:'162px'},
-    {key:'title', label:'Title', type:'text', w:'204px'},
-    {key:'country', label:'Country', type:'enum', w:'142px', render:r=>chip(r.country), foot:footUniq('country')},
-    {key:'state', label:'State', type:'enum', w:'82px',
-     render:r=>r.state?chip(r.state,PAIR.mute):'<span style="color:var(--ink-3)">—</span>'},
+    {key:'lead_id', label:'Lead ID', type:'mono', w:'88px', render:r=>`<span class="mono">${esc(r.lead_id)}</span>`},
+    {key:'contact_name', label:'Contact', type:'person', w:'150px',
+     render:r=>`<span>${esc(r.contact_name)}<span style="color:var(--ink-3)"> · ${esc(r.title)}</span></span>`},
+    {key:'country', label:'Region', type:'enum', w:'132px',
+     render:r=>chip([r.state,r.country].filter(Boolean).join(' · ')), foot:footUniq('country')},
     {key:'notes', label:'Inbound note', type:'text',
      render:r=>`<span style="color:var(--ink-2)" title="${esc(r.notes)}">${esc(r.notes)}</span>`},
-    {key:'status', label:'Last outcome', type:'enum', w:'126px',
+    {key:'status', label:'Last outcome', type:'enum', w:'118px',
      sort:r=>leadOutcome(r.lead_id).status||'~',
      render:r=>{ const o=leadOutcome(r.lead_id);
        return o.status?chip(o.status.toUpperCase(), OUT_PAIR[o.status]):'<span style="color:var(--ink-3)">never run</span>'; },
      foot:rows=>`<b>${rows.filter(r=>leadOutcome(r.lead_id).status).length}</b> run`},
-    {key:'owner', label:'Routed to', type:'person', w:'150px',
+    {key:'owner', label:'Routed to', type:'person', w:'146px',
      sort:r=>leadOutcome(r.lead_id).rep,
      render:r=>{ const o=leadOutcome(r.lead_id);
        return o.rep?`<span class="cell-id">${sq(o.rep)}<span class="nm">${esc(o.rep)}</span></span>`
                    :'<span style="color:var(--ink-3)">—</span>'; }},
-    {key:'prio', label:'Priority', type:'enum', w:'92px',
+    {key:'prio', label:'Priority', type:'enum', w:'86px',
      sort:r=>leadOutcome(r.lead_id).score,
      render:r=>{ const o=leadOutcome(r.lead_id);
        return o.priority?chip(o.priority, o.priority==='P1'?PAIR.hot:PAIR.cool):'<span style="color:var(--ink-3)">—</span>'; }},
-    {key:'score', label:'Propensity', type:'num', align:'r', w:'104px',
+    {key:'score', label:'Propensity', type:'num', align:'r', w:'98px',
      sort:r=>leadOutcome(r.lead_id).score,
      render:r=>{ const o=leadOutcome(r.lead_id);
        return o.score!=null?`<b style="font-weight:600">${o.score.toFixed(4)}</b>`:'<span style="color:var(--ink-3)">—</span>'; }},
-    {key:'go', label:'Action', type:'text', w:'96px',
+    {key:'go', label:'Action', type:'text', w:'84px',
      render:()=>`<span style="color:var(--brand);font-weight:600;display:inline-flex;align-items:center;gap:5px">${ico('i-play')}Run</span>`,
      sort:()=>0},
   ];
@@ -1225,7 +1248,16 @@ function vInsights(v){
            <i style="display:block;height:100%;width:${p.toFixed(1)}%;background:var(--brand)"></i></span>
          <span class="num" style="font-size:11px;color:var(--ink-2);width:34px;text-align:right">${p.toFixed(0)}%</span></span>`;
      }, sort:r=>r.routed},
-    {key:'leads', label:'Leads handled', type:'text', w:'150px',
+    {key:'book_accounts', label:'Accounts', type:'num', align:'r', w:'96px',
+     sort:r=>terrBook(r.territory).accounts, render:r=>num(terrBook(r.territory).accounts),
+     foot:rows=>`<b>Σ</b> ${num(S.accounts.length)}`},
+    {key:'book_open', label:'Territory pipeline', type:'money', align:'r', w:'140px',
+     sort:r=>terrBook(r.territory).open, render:r=>money(terrBook(r.territory).open),
+     foot:rows=>`<b>Σ</b> ${money(S.accounts.reduce((a,x)=>a+x.open_amount,0))}`},
+    {key:'book_acts', label:'Acts 30d', type:'num', align:'r', w:'96px',
+     sort:r=>terrBook(r.territory).acts, render:r=>num(terrBook(r.territory).acts),
+     foot:rows=>`<b>Σ</b> ${num(S.accounts.reduce((a,x)=>a+x.activities_30d,0))}`},
+    {key:'leads', label:'Leads handled', type:'text', w:'146px',
      sort:r=>repLeads(r.name).length,
      render:r=>{ const L=repLeads(r.name);
        return L.length ? L.map(x=>`<span class="chip" style="background:var(--bg-active);color:var(--ink-2)">${esc(x)}</span>`).join(' ')
@@ -1239,6 +1271,16 @@ function vInsights(v){
   v.appendChild(host);
   renderTable(host,'insights',cols,reps,{unit:'reps', sortKey:'routed', sortDir:'desc',
     hint:'load is derived from the append-only log, not stored per rep'});
+}
+/* The real book behind a rep's territory, from the account rollups. */
+const _tb = {};
+function terrBook(t){
+  if(!_tb[t]){
+    const a = S.accounts.filter(x=>x.territory===t);
+    _tb[t] = {accounts:a.length, open:a.reduce((s,x)=>s+x.open_amount,0),
+              acts:a.reduce((s,x)=>s+x.activities_30d,0)};
+  }
+  return _tb[t];
 }
 /* Which leads a rep actually touched, from routing + applied records. */
 function repLeads(name){
@@ -1396,9 +1438,10 @@ function vModel(v){
   const scores = S.scores ? S.scores.scores : [];
   if(scores.length){
     const p1 = S.scores.p1_threshold;
+    scores.forEach((r,i)=>{ r._rank = i+1; });   // /api/scores is already score-desc
     const h = el('div','phead');
     h.innerHTML = `<h2>Propensity across the book</h2><div class="sp"></div>
-      <span class="pmeta">all ${num(scores.length)} accounts scored by propensity_v1 as of ${esc(fmtTime(S.scores.as_of))}</span>`;
+      <span class="pmeta">all ${num(scores.length)} accounts scored by propensity_v1 at the scoring clock ${esc(fmtTime(S.scores.as_of))}</span>`;
     v.appendChild(h);
     const cols = [
       {key:'account', label:'Account', type:'text', w:'190px',
@@ -1406,8 +1449,9 @@ function vModel(v){
       {key:'score', label:'Propensity', type:'num', align:'r', w:'112px',
        render:r=>`<b style="font-weight:600;color:${r.score>=p1?'var(--hot)':'var(--ink)'}">${r.score.toFixed(4)}</b>`,
        foot:footAvg('score',4)},
-      {key:'band', label:'Rank', type:'num', w:'150px',
+      {key:'band', label:'Rank', type:'num', w:'168px',
        render:r=>`<span style="display:flex;align-items:center;gap:8px">
+          <span class="num" style="width:26px;text-align:right;color:var(--ink-3);font-size:11px">${r._rank}</span>
           <span style="flex:1;height:6px;border-radius:3px;background:var(--bg-active);overflow:hidden">
             <i style="display:block;height:100%;width:${(r.score*100).toFixed(1)}%;background:${r.score>=p1?'var(--hot)':'var(--brand)'}"></i></span></span>`,
        sort:r=>r.score},
@@ -1417,7 +1461,6 @@ function vModel(v){
       {key:'activity_count_30d', label:'Acts 30d', type:'num', align:'r', w:'98px', foot:footAvg('activity_count_30d',1)},
       {key:'distinct_contacts_engaged', label:'Engaged', type:'num', align:'r', w:'96px', foot:footAvg('distinct_contacts_engaged',1)},
       {key:'days_since_last_activity', label:'Days since', type:'num', align:'r', w:'104px', foot:footAvg('days_since_last_activity',0)},
-      {key:'prior_opportunity_count', label:'Prior opps', type:'num', align:'r', w:'102px', foot:footSum('prior_opportunity_count')},
       {key:'employee_band', label:'Employees', type:'enum', w:'116px',
        render:r=>chip(r.employee_band, BAND_PAIR[r.employee_band])},
       {key:'industry_fit', label:'Industry fit', type:'enum', w:'116px',
@@ -1427,7 +1470,8 @@ function vModel(v){
        render:r=>chip(r.territory, TERR_PAIR[r.territory]), foot:footUniq('territory')},
     ];
     const host = el('div'); v.appendChild(host);
-    renderTable(host,'scorebook',cols,scores,{unit:'accounts', sortKey:'score', sortDir:'desc'});
+    renderTable(host,'scorebook',cols,scores,{unit:'accounts', sortKey:'score', sortDir:'desc',
+      hint:'prior_opportunity_count is 2 for every account at this clock, so it is omitted here'});
   }
 }
 
@@ -1435,21 +1479,32 @@ function vModel(v){
    Record view — one lead's real run
    ========================================================================= */
 function vLead(v, token){
-  if(!S.run){ location.hash='#/overview'; return; }
+  if(!S.run){
+    topbar('Routing Queue \u203a '+(token||''), 'no run loaded for this lead in this session', []);
+    v.innerHTML = `<div class="empty">Nothing has been routed for <b>${esc(token||'')}</b> in this session,
+      so there is no audit delta to draw.<br><br>
+      Open it from the <a href="#/queue" style="color:var(--brand-ink);font-weight:600">Routing Queue</a>
+      to run the engine over it.</div>`;
+    return;
+  }
   const run = S.run;
   const lead = S.leads.find(l=>l.file===S.runLead || l.lead_id===run.lead_id) || {};
   const ctx  = run.account || null;
   const acct = ctx ? ctx.account : null;
-  const stg  = k => (run.stages||[]).find(s=>s.stage===k);
+  /* records IS the append-only delta this run wrote; stages omits routing_skip,
+     so reading stages made the page contradict the log on the same screen. */
+  const trace = (run.records && run.records.length) ? run.records : (run.stages||[]);
+  const stg  = k => trace.find(s=>s.stage===k);
   const mS=stg('match'), tS=stg('tie_break'), eS=stg('enrich'), iS=stg('intent_summary'),
         sS=stg('score'), kS=stg('routing_skip'), rS=stg('routing');
   const pa = stg('pending_approval');
   const prop = run.proposal || (pa && pa.decision ? pa.decision.proposal : null);
   const applied = run.status==='applied' || !!stg('assignment_applied');
   const rejected = run.status==='rejected' || !!stg('rejected');
+  run._trace = trace;
 
   topbar('Routing Queue › '+run.lead_id,
-    `${(run.stages||[]).length} stages · ${(run.records||[]).length} audit records written by this run`,
+    `${trace.length} stages · ${(run.records||[]).length} audit records written by this run`,
     [{label:'Back to overview', icon:'i-back', on:()=>{ location.hash='#/overview'; }},
      {label:'Export audit', icon:'i-dl', on:exportAudit}]);
 
@@ -1501,7 +1556,7 @@ function vLead(v, token){
     ['i-user','Owner', `<span style="font-weight:550">${esc(rS.decision.rep)}</span>`],
     ['i-map','Routed territory', chip(rS.decision.territory, TERR_PAIR[rS.decision.territory])],
     ['i-rr','Rotation', `<span class="mono" style="font-size:11px">${esc(rS.rule_fired)}</span>`],
-    ['i-skip','Skipped', kS?chip(kS.decision.skipped_rep+' · '+kS.decision.reason.replace(/_/g,' '), PAIR.bad):'<span class="none">none</span>'],
+    ['i-skip','Skipped', kS?chip(kS.decision.skipped_rep, PAIR.bad)+`<span style="color:var(--ink-3);font-size:11px"> ${esc(kS.decision.reason.replace(/_/g,' '))}</span>`:'<span class="none">not needed</span>'],
     ['i-shield','Status', applied?chip('ASSIGNMENT APPLIED',PAIR.ok):rejected?chip('REJECTED',PAIR.bad):chip('PENDING APPROVAL',PAIR.warn)],
   ]);
   const block = (title, node)=>{
@@ -1552,9 +1607,9 @@ function vLead(v, token){
     });
     block('MATCH CANDIDATES', list);
   }
-  const runFb = (run.stages||[]).filter(x=>x.fallback_used);
+  const runFb = trace.filter(x=>x.fallback_used);
   grp('THIS RUN', [
-    ['i-flow','Stages', `<span class="num">${(run.stages||[]).length}</span>`],
+    ['i-flow','Stages', `<span class="num">${trace.length}</span>`],
     ['i-log','Records written', `<span class="num">${(run.records||[]).length}</span>`],
     ['i-warn','Fallbacks', runFb.length?chip(runFb.length+' used',PAIR.warn):'<span class="none">none</span>'],
     ['i-shield','Inputs hash', (run.records||[])[0]
@@ -1681,10 +1736,11 @@ function leadOverview(pad, run, s, ctx, prop, applied, rejected){
   pad.appendChild(sec2);
 
   /* Waterfall — sequential per-stage status */
-  const fbCount = (run.stages||[]).filter(x=>x.fallback_used).length;
+  const tr = run._trace || run.records || run.stages || [];
+  const fbCount = tr.filter(x=>x.fallback_used).length;
   const sec3 = el('div','sec');
   sec3.innerHTML = `<div class="sec-h"><h3>Stage waterfall</h3><div class="sp"></div>
-    <span class="hint">${fbCount} of ${(run.stages||[]).length} stages fell back to a deterministic rule</span></div>`;
+    <span class="hint">${fbCount} of ${tr.length} stages fell back to a deterministic rule</span></div>`;
   sec3.appendChild(waterfall(run));
   pad.appendChild(sec3);
 
@@ -1727,128 +1783,174 @@ const NODE_TONE = {
   ok:['var(--ok-t)','var(--ok)'], warn:['var(--warn-t)','var(--warn)'],
   bad:['var(--bad-t)','var(--bad)'], brand:['var(--brand-tint)','var(--brand-ink)'],
   cool:['var(--cool-t)','var(--cool)'], hot:['var(--hot-t)','var(--hot)'],
-  mute:['#fff','#8E8E99'],
+  mute:['#fff','#8E8E99'], ghost:['#FBFBFC','#A9A9B4'],
 };
 let FLOW = null;
-function flowCanvas(run, s){
-  const {mS,tS,eS,iS,sS,kS,rS} = s;
+/* The trace is built from run.records — the audit delta itself — never from
+   run.stages, which omits routing_skip and would make the page contradict the
+   log it is displaying.
+
+   Grammar: a SOLID coloured edge is the path this record took and is labelled
+   with the condition that routed it there. A DASHED grey edge with a dimmed
+   node is a branch the flow defines but this record did not take; those ghosts
+   show the configured RULE or THRESHOLD, never invented data. Result cards
+   hang off thin dotted connectors and carry no label. */
+function flowCanvas(run, st){
+  const {mS,tS,eS,iS,sS,kS,rS} = st;
   const nodes = [], edges = [];
-  const SPINE = 138, BR = 438, BR2 = 716;
-  const NW = 184, NH = 54, PITCH = 94;
-  let y = 28;
-  const spine = (o)=>{ const n=Object.assign({x:SPINE-NW/2, y, w:NW, h:NH, shape:'rect'}, o); nodes.push(n); return n; };
-  const branch = (o, col)=>{ const n=Object.assign({x:(col||BR)-98, y:y+2, w:196, h:50, shape:'rect'}, o); nodes.push(n); return n; };
+  const L = 152, SPINE = 456, R = 778, R2 = 1036;
+  const SW = 202, SH = 54, GW = 188, GH = 48, RW = 210, RH = 52, PITCH = 96;
+  let y = 30;
 
-  const n0 = spine({shape:'pill', tone:'mute', tag:'INBOUND', t:run.lead_id, s:'data/inbound'});
+  const add = o => { nodes.push(o); return o; };
+  const spine  = o => add(Object.assign({x:SPINE-SW/2, y, w:SW, h:SH, shape:'rect'}, o));
+  const dia    = o => add(Object.assign({x:SPINE-113, y:y-8, w:226, h:70, shape:'dia'}, o));
+  const result = o => add(Object.assign({x:R-RW/2, y:y+1, w:RW, h:RH, shape:'rect'}, o));
+  const far    = o => add(Object.assign({x:R2-98, y:y+1, w:196, h:RH, shape:'rect'}, o));
+  const ghost  = o => add(Object.assign({x:L-GW/2, y:y+3, w:GW, h:GH, shape:'rect',
+                                         tone:'ghost', ghost:true}, o));
+  const flow   = (a,b,label,tone) => edges.push({a,b,label,tone});
+  const note   = (a,b) => edges.push({a,b,dir:'r',annot:true});
+  const notTaken = (a,b,label) => edges.push({a,b,dir:'l',ghost:true,label});
+
+  const th = S.terr;
+
+  /* 1 — inbound */
+  const nIn = spine({shape:'pill', tone:'mute', tag:'INBOUND', t:run.lead_id, s:'data/inbound'});
   y += PITCH;
-  const annot = (from,to)=>edges.push({a:from,b:to,dir:'r',annot:true});
 
-  const amb = !!(mS && mS.decision.status==='ambiguous');
-  const n1 = spine({shape:'pent', tone: amb?'warn':'ok', tag:'MATCH',
-                    t:'Lead matches Account?', s:mS?mS.rule_fired:'—'});
-  edges.push({a:n0,b:n1,label:'Insert'});
+  /* 2 — match, with its three real outcomes */
+  const status = mS ? mS.decision.status : null;
+  const amb = status === 'ambiguous';
+  const nMatch = add(Object.assign({x:SPINE-SW/2, y, w:SW, h:60, shape:'pent', tag:'MATCH',
+    tone: status==='matched' ? 'ok' : amb ? 'warn' : 'bad',
+    t:'Lead matches Account?', s:mS?mS.rule_fired:'—'}));
+  flow(nIn, nMatch, 'Insert');
+  let matchExit = 'Match';
   if(mS){
     if(amb){
-      const cands = mS.decision.candidates||[];
-      const nb = branch({tone:'warn', t:cands.length+' candidates @ '+mS.decision.score,
-                         s:cands.map(c=>c.name).join(' · ')});
-      edges.push({a:n1,b:nb,label:'No Match',tone:'bad',dir:'r'});
-      const nt = branch({tone:'ok', tag:'TIE-BREAK', t:tS?tS.decision.account_name:'—',
-                         s:tS?tS.rule_fired:'—'}, BR2);
-      edges.push({a:nb,b:nt,label:'Ambiguous',tone:'warn',dir:'r'});
+      matchExit = 'Resolved by tie-break';
+      const nc = result({tone:'warn', t:(mS.decision.candidates||[]).length+' candidates @ '+mS.decision.score,
+        s:(mS.decision.candidates||[]).map(c=>c.name).join(' · ')});
+      flow(nMatch, nc, 'Ambiguous · ≥ '+th.match_ambiguous, 'warn');
+      edges[edges.length-1].dir = 'r';
+      const nt = far({tone:'ok', tag:'TIE-BREAK', t:tS?tS.decision.account_name:'—', s:tS?tS.rule_fired:'—'});
+      flow(nc, nt, 'Highest score', 'ok');
+      edges[edges.length-1].dir = 'r';
+      notTaken(nMatch, ghost({t:'Exact domain match', s:'auto-match ≥ '+th.match_auto}), 'Match');
+    } else if(status==='matched'){
+      note(nMatch, result({tone:'ok', t:mS.decision.account_name,
+        s:'account #'+mS.decision.account_id+' · confidence '+mS.decision.score}));
+      notTaken(nMatch, ghost({t:'Fuzzy name candidates', s:'ambiguous ≥ '+th.match_ambiguous}), 'No exact match');
     } else {
-      const nb = branch({tone:'ok', t:mS.decision.account_name,
-                         s:'account #'+mS.decision.account_id+' · confidence '+mS.decision.score});
-      annot(n1,nb);
+      matchExit = 'No match';
+      note(nMatch, result({tone:'bad', t:'No account matched', s:mS.rule_fired}));
+      notTaken(nMatch, ghost({t:'Exact domain match', s:'auto-match ≥ '+th.match_auto}), 'Match');
     }
   }
-  y += PITCH;
+  y += PITCH + 6;
 
-  const n2 = spine({tone:'cool', tag:'ENRICH', t:'Warehouse context', s:eS?eS.rule_fired:'—'});
-  edges.push({a:n1,b:n2,label:amb?'Resolved by tie-break':'Match',tone:'ok'});
+  /* 3 — enrich (only if the record has one) */
+  let prev = nMatch;
   if(eS){
-    const d=eS.decision;
-    const nb = branch({tone:'cool', t:d.n_contacts+' contacts · '+d.n_recent_activities+' activities',
-      s:d.industry+' · '+d.employee_band+' · '+d.territory});
-    annot(n2,nb);
+    const d = eS.decision;
+    const nEn = spine({tone:'cool', tag:'ENRICH', t:'Warehouse context', s:eS.rule_fired});
+    flow(prev, nEn, matchExit, status==='matched'||amb ? 'ok' : 'bad');
+    note(nEn, result({tone:'cool', t:d.n_contacts+' contacts · '+d.n_recent_activities+' activities',
+      s:d.industry+' · '+d.employee_band+' · '+d.territory}));
+    prev = nEn; y += PITCH;
   }
-  y += PITCH;
 
-  const n3 = spine({shape:'dia', tone: iS&&iS.fallback_used?'warn':'ok', tag:'JUDGE', t:'LLM available?', s:''});
-  n3.w = 216; n3.h = 68; n3.x = SPINE-108; n3.y = y-7;
-  edges.push({a:n2,b:n3,label:'Context loaded'});
+  /* 4 — LLM judgment, a real two-way gate */
   if(iS){
     const fb = iS.fallback_used;
-    const nb = branch({tone:fb?'warn':'ok', t:titleize(iS.decision.intent), s:iS.rule_fired});
-    /* A real branch: 'No' takes the deterministic keyword path, 'Yes' the LLM. */
-    edges.push({a:n3,b:nb,label:fb?'No':'Yes',tone:fb?'warn':'ok',dir:'r'});
+    const nJ = dia({tone: fb?'warn':'ok', tag:'JUDGE', t:'LLM available?', s:''});
+    flow(prev, nJ, eS?'Context loaded':matchExit);
+    const nOut = result({tone:fb?'warn':'ok', t:titleize(iS.decision.intent), s:iS.rule_fired});
+    flow(nJ, nOut, fb?'No':'Yes', fb?'warn':'ok');
+    edges[edges.length-1].dir = 'r';
+    notTaken(nJ, ghost({t: fb?'LLM intent summary':'Deterministic keywords',
+      s: fb?'--llm, key present':'offline fallback'}), fb?'Yes':'No');
+    prev = nJ; y += PITCH;
   }
-  y += PITCH;
 
-  const n4 = spine({tone:'brand', tag:'SCORE', t:'propensity_v1',
-                    s:'holdout AUC '+fmtAuc()});
-  edges.push({a:n3,b:n4,label:iS?titleize(iS.decision.intent):'Classified',
-              tone:iS&&iS.fallback_used?'warn':'ok'});
+  /* 5 — score */
   if(sS){
+    const nS = spine({tone:'brand', tag:'SCORE', t:'propensity_v1', s:'holdout AUC '+fmtAuc()});
+    flow(prev, nS, iS?titleize(iS.decision.intent):'Enriched', iS&&iS.fallback_used?'warn':'ok');
     const top = run.score_explain ? run.score_explain[0] : null;
-    const nb = branch({tone:'brand', t:String(sS.decision.propensity_score),
+    note(nS, result({tone:'brand', t:String(sS.decision.propensity_score),
       s: top ? `${top.feature} ${top.contribution>=0?'+':''}${top.contribution}`
-             : S.stats.model.n_features+' features'});
-    annot(n4,nb);
+             : S.stats.model.n_features+' features'}));
+    prev = nS; y += PITCH;
   }
-  y += PITCH;
 
-  const n5 = spine({shape:'dia', tone: kS?'warn':'ok', tag:'ROUTE', t:'Rep available?', s:''});
-  n5.w = 216; n5.h = 68; n5.x = SPINE-108; n5.y = y-7;
-  /* The scoring threshold is the condition that set priority, so the edge says so. */
-  edges.push({a:n4,b:n5,
-    label: sS ? (sS.decision.propensity_score>=S.terr.p1_threshold
-                  ? `P1 · score ≥ ${S.terr.p1_threshold}` : `P2 · score < ${S.terr.p1_threshold}`) : 'Scored',
-    tone: sS && sS.decision.propensity_score>=S.terr.p1_threshold ? 'hot' : undefined});
-  if(kS){
-    const nb = branch({tone:'bad', t:kS.decision.skipped_rep, s:kS.decision.reason.replace(/_/g,' ')});
-    edges.push({a:n5,b:nb,label:'No',tone:'bad',dir:'r'});
-  }
-  y += PITCH;
-
-  let n6 = null;
+  /* 6 — routing gate, with the skip branch drawn when it actually fired */
   if(rS){
-    n6 = spine({tone:'ok', tag:'ASSIGN', t:rS.decision.rep,
-      s:rS.decision.territory+' · '+rS.decision.priority+' · SLA '+rS.decision.sla_minutes+'m'});
-    edges.push({a:n5,b:n6,label:kS?'Round Robin again':'Yes',tone:'ok'});
+    const nR = dia({tone: kS?'warn':'ok', tag:'ROUTE', t:'Rep available?', s:''});
+    const p1 = sS && sS.decision.propensity_score >= th.p1_threshold;
+    flow(prev, nR, sS ? (p1 ? `P1 · score ≥ ${th.p1_threshold}` : `P2 · score < ${th.p1_threshold}`) : 'Routed',
+         p1 ? 'hot' : undefined);
+    if(kS){
+      const nSkip = result({tone:'bad', tag:'SKIP', t:kS.decision.skipped_rep,
+        s:kS.decision.reason.replace(/_/g,' ')});
+      flow(nR, nSkip, 'No', 'bad');
+      edges[edges.length-1].dir = 'r';
+      y += PITCH;
+      const nA = spine({tone:'ok', tag:'ASSIGN', t:rS.decision.rep,
+        s:rS.decision.territory+' · '+rS.decision.priority+' · SLA '+rS.decision.sla_minutes+'m'});
+      flow(nSkip, nA, 'Next in rotation', 'ok');
+      prev = nA;
+    } else {
+      y += PITCH;
+      const nA = spine({tone:'ok', tag:'ASSIGN', t:rS.decision.rep,
+        s:rS.decision.territory+' · '+rS.decision.priority+' · SLA '+rS.decision.sla_minutes+'m'});
+      flow(nR, nA, 'Yes', 'ok');
+      notTaken(nR, ghost({t:'Skip to next rep', s:'rep unavailable'}), 'No');
+      prev = nA;
+    }
     y += PITCH;
   }
 
-  const applied = !!(run.stages||[]).find(x=>x.stage==='assignment_applied');
-  const rejected = !!(run.stages||[]).find(x=>x.stage==='rejected');
-  const n7 = spine({shape:'pill', tone: applied?'ok':rejected?'bad':'warn', tag:'HITL',
-    t: applied?'Assignment applied':rejected?'Proposal rejected':'Awaiting human approval',
-    s: applied?'written to the warehouse':rejected?'nothing written':'hitl_gate'});
-  if(n6) edges.push({a:n6,b:n7,label:'Assignment proposed'});
+  /* 7 — terminal state, exactly as the log records it */
+  const recStage = k => (run.records||[]).some(r=>r.stage===k);
+  const applied = recStage('assignment_applied'), rejected = recStage('rejected');
+  const review  = recStage('routed_to_review');
+  const nEnd = spine({shape:'pill', tag:'HITL',
+    tone: applied?'ok':rejected?'bad':review?'cool':'warn',
+    t: applied?'Assignment applied':rejected?'Proposal rejected'
+       :review?'Routed to manual review':'Awaiting human approval',
+    s: applied?'human_approved':rejected?'nothing written':review?'routed_to_review':'hitl_gate'});
+  flow(prev, nEnd, rS?'Assignment proposed':'Escalated');
+  if(!applied && !rejected){
+    notTaken(nEnd, ghost({t:'Auto-assign', s:'disabled by the HITL gate'}), 'Never');
+  }
 
-  /* Fit the canvas to what this run actually drew — a fixed width would leave
-     a few hundred px of empty grid whenever a lead takes the short path. */
-  const H = y + NH + 30;
-  const W = Math.max(...nodes.map(n=>n.x+n.w)) + 40;
+  const H = y + SH + 34;
+  const W = Math.max(...nodes.map(n=>n.x+n.w)) + 44;
   FLOW = {nodes, edges, W, H};
 
   const wrap = el('div','canvas-wrap');
   const bar = el('div','canvas-bar');
   bar.innerHTML = `<span class="chip chip-live dot">LIVE</span>
     <span class="ttl">Lead to Account Routing · ${esc(run.lead_id)}</span>
-    <span class="chip" style="background:var(--bg-active);color:var(--ink-2)">${nodes.length} nodes</span>
+    <span class="chip" style="background:var(--bg-active);color:var(--ink-2)">${nodes.filter(n=>!n.ghost).length} nodes</span>
     <div class="sp"></div>
-    <span class="pmeta">solid edges are the path taken · dashed are results</span>`;
+    <span class="pmeta">solid = path taken · dashed = branch not taken · dotted = result</span>`;
   wrap.appendChild(bar);
   const scroll = el('div','canvas-scroll');
   const cv = el('div','canvas');
   cv.style.width = W+'px'; cv.style.height = H+'px';
   cv.innerHTML = `<svg class="edges" viewBox="0 0 ${W} ${H}">
-    <defs><marker id="ah" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0 1 L9 5 L0 9 z" fill="#9A9AA4"/></marker></defs><g id="edgeG"></g></svg>`;
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0 1 L9 5 L0 9 z" fill="#9A9AA4"/></marker>
+      <marker id="ahg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0 1 L9 5 L0 9 z" fill="#C7C7D0"/></marker>
+    </defs><g id="edgeG"></g></svg>`;
   nodes.forEach(n=>{
     const [bg,fg] = NODE_TONE[n.tone]||NODE_TONE.mute;
-    const d = el('div','nd');
+    const d = el('div','nd'+(n.ghost?' ghost':''));
     d.style.cssText = `left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px`;
     d.innerHTML = `<span class="nd-box sh-${n.shape}" style="background:${fg}">
         <span class="nd-in sh-${n.shape}" style="background:${bg};color:${fg}">
@@ -1858,7 +1960,7 @@ function flowCanvas(run, s){
     cv.appendChild(d);
   });
   edges.forEach(e=>{
-    const l = el('div','elbl'+(e.tone?' '+e.tone:''), e.label||'');
+    const l = el('div','elbl'+(e.tone?' '+e.tone:'')+(e.ghost?' gh':''), e.label||'');
     l.dataset.edge='1';
     if(!e.label) l.style.display='none';
     cv.appendChild(l);
@@ -1874,19 +1976,24 @@ function drawEdges(){
   FLOW.edges.forEach((e,i)=>{
     const a=e.a, b=e.b;
     let x1,y1,x2,y2,d,mx,my;
-    if(e.dir==='r'){
+    if(e.dir==='r'){                       // spine -> right lane
       x1=a.x+a.w; y1=a.y+a.h/2; x2=b.x; y2=b.y+b.h/2;
       const c=(x1+x2)/2;
       d=`M${x1} ${y1} C${c} ${y1} ${c} ${y2} ${x2} ${y2}`;
       mx=(x1+x2)/2; my=(y1+y2)/2;
-    } else {
+    } else if(e.dir==='l'){                // spine -> left lane (branch not taken)
+      x1=a.x; y1=a.y+a.h/2; x2=b.x+b.w; y2=b.y+b.h/2;
+      const c=(x1+x2)/2;
+      d=`M${x1} ${y1} C${c} ${y1} ${c} ${y2} ${x2} ${y2}`;
+      mx=(x1+x2)/2; my=(y1+y2)/2;
+    } else {                               // down the spine
       x1=a.x+a.w/2; y1=a.y+a.h; x2=b.x+b.w/2; y2=b.y;
       d=`M${x1} ${y1} L${x2} ${y2}`;
       mx=(x1+x2)/2; my=(y1+y2)/2;
     }
-    paths += e.annot
-      ? `<path d="${d}" fill="none" stroke="#C2C2CB" stroke-width="1.2" stroke-dasharray="3 3"/>`
-      : `<path d="${d}" fill="none" stroke="#9A9AA4" stroke-width="1.4" marker-end="url(#ah)"/>`;
+    if(e.annot)      paths += `<path d="${d}" fill="none" stroke="#C9C9D2" stroke-width="1.1" stroke-dasharray="2 3"/>`;
+    else if(e.ghost) paths += `<path d="${d}" fill="none" stroke="#C7C7D0" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#ahg)"/>`;
+    else             paths += `<path d="${d}" fill="none" stroke="#9A9AA4" stroke-width="1.5" marker-end="url(#ah)"/>`;
     const lb = labels[i];
     if(lb){ lb.style.left=mx+'px'; lb.style.top=my+'px'; }
   });
@@ -1898,7 +2005,7 @@ function waterfall(run){
   const h = el('div','wf-h');
   h.innerHTML = `<div>#</div><div>Stage</div><div>Rule fired</div><div>Source</div><div>Result</div>`;
   wf.appendChild(h);
-  (run.stages||[]).forEach((s,i)=>{
+  (run._trace || run.records || run.stages || []).forEach((s,i)=>{
     const r = el('div','wf-r');
     const fb = s.fallback_used;
     const tone = fb?'warn':(s.stage==='routing_skip'?'bad':'ok');
