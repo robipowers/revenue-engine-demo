@@ -175,6 +175,17 @@ CREATE TABLE opportunities (
 # ---------------------------------------------------------------------------
 
 def _generate(rng: random.Random):
+    # Deal amounts are presentation only -- `amount` is not a model feature.
+    # Drawing them from the shared stream meant a cosmetic pricing tweak
+    # reshuffled every downstream engagement draw and moved holdout AUC, so
+    # pricing gets its own independent generator.
+    price_rng = random.Random(RANDOM_SEED + 977)
+    # The engagement signal is what the model learns from, so it gets its own
+    # generator too. Sharing one stream meant an unrelated cosmetic edit
+    # reshuffled every feature and swung holdout AUC by 0.3 on an 18-row
+    # holdout -- the numbers moved for reasons that had nothing to do with the
+    # data's meaning.
+    signal_rng = random.Random(RANDOM_SEED + 4242)
     accounts = []
     for i, (name, domain, industry, country, state) in enumerate(COMPANIES, start=1):
         accounts.append(
@@ -288,11 +299,17 @@ def _generate(rng: random.Random):
             # rate, with an occasional negotiated discount. A uniform band of
             # round $500 multiples is the loudest "generated data" tell there
             # is, and it makes the Amount column useless for sorting.
-            seats = max(5, int(rng.lognormvariate(3.5, 0.85)))
-            per_seat = rng.choice([540, 660, 780, 900, 1_080, 1_200, 1_450])
+            seats = max(5, int(price_rng.lognormvariate(3.5, 0.85)))
+            per_seat = price_rng.choice([540, 660, 780, 900, 1_080, 1_200, 1_450])
             amount = seats * per_seat
-            if rng.random() < 0.35:                      # negotiated down
-                amount = int(amount * rng.uniform(0.82, 0.95))
+            if price_rng.random() < 0.35:                # negotiated down
+                amount = int(amount * price_rng.uniform(0.82, 0.95))
+            # A real book is a MIX: quotes computed from seats sit next to deals
+            # a rep negotiated to a round number. All-computed reads as machine
+            # output just as loudly as all-round does.
+            if price_rng.random() < 0.3:
+                step = 5_000 if amount >= 60_000 else 1_000
+                amount = max(step, round(amount / step) * step)
             amount = min(max(amount, 6_000), 940_000)
             opportunities.append(
                 {
@@ -312,19 +329,20 @@ def _generate(rng: random.Random):
             # fake-looking perfect separation of a toy dataset.
             roster = contacts_by_account[acct["id"]]
             if outcome == "won":
-                n_acts = rng.randint(4, 13)
-                engaged = rng.sample(roster, rng.randint(2, 3))
+                n_acts = signal_rng.randint(6, 15)
+                engaged = signal_rng.sample(roster, signal_rng.randint(2, 3))
             elif outcome == "open":
-                n_acts = rng.randint(3, 9)
-                engaged = rng.sample(roster, rng.randint(1, 3))
+                n_acts = signal_rng.randint(3, 10)
+                engaged = signal_rng.sample(roster, signal_rng.randint(1, 3))
             else:  # lost: thinner, more single-threaded engagement
-                n_acts = rng.randint(1, 8)
-                engaged = rng.sample(roster, rng.randint(1, 2))
+                n_acts = signal_rng.randint(1, 6)
+                engaged = signal_rng.sample(roster, signal_rng.randint(1, 2))
             for _ in range(n_acts):
                 ts = created_at - timedelta(
-                    days=rng.uniform(0.5, 29.5), hours=rng.uniform(0, 6)
+                    days=signal_rng.uniform(0.5, 29.5),
+                    hours=signal_rng.uniform(0, 6),
                 )
-                add_activity(acct["id"], rng.choice(engaged), ts)
+                add_activity(acct["id"], signal_rng.choice(engaged), ts)
 
     # Background noise spread across all accounts and the full timeline
     # (also blurs the pre-creation windows, which keeps AUC honest).

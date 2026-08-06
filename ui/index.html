@@ -88,10 +88,13 @@ svg{display:block}
 
 /* ---------- chips ---------- */
 .chip{
-  display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;
+  /* inline-block, not inline-flex: a flex container never applies
+     text-overflow to its own text, which sheared long chips mid-glyph. */
+  display:inline-block;vertical-align:middle;font-size:11px;font-weight:600;
   padding:2px 7px;border-radius:4px;line-height:1.35;white-space:nowrap;letter-spacing:.005em;
   max-width:100%;overflow:hidden;text-overflow:ellipsis
 }
+.chip.dot::before{margin-right:4px;display:inline-block;vertical-align:middle}
 .chip.dot::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex:none;opacity:.85}
 .chip-live{background:var(--ok-t);color:var(--ok);font-weight:650;letter-spacing:.05em}
 
@@ -519,6 +522,11 @@ function safe(str){
   return t;
 }
 const fmtAuc = () => S.stats.model.holdout_auc.toFixed(4);
+/* A logistic score piles up near 0 and 1, and a column reading "0.0000"
+   looks like a broken model rather than a confident one. */
+const fmtScore = x => x==null ? '—'
+  : x > 0 && x < 0.0001 ? '<0.0001'
+  : x < 1 && x > 0.9999 ? '>0.9999' : x.toFixed(4);
 const titleize = s => String(s||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
 const initials = s => String(s||'?').replace(/[^A-Za-z0-9 ]/g,'').split(/\s+/).filter(Boolean)
                         .slice(0,2).map(w=>w[0].toUpperCase()).join('') || '?';
@@ -651,7 +659,13 @@ function currentRoute(){
   const h = location.hash.replace(/^#\/?/,'');
   if(h.startsWith('lead/')) return {view:'lead', arg:h.slice(5)};
   const ids = NAV.flatMap(g=>g.items.map(i=>i.id));
-  return {view: ids.includes(h) ? h : 'overview'};
+  if(ids.includes(h)) return {view:h};
+  /* Correct the common near-misses rather than silently showing another page. */
+  const ALIAS = {roundrobin:'rr', 'round-robin':'rr', territory:'terr',
+                 territories:'terr', leads:'queue', opportunities:'opps',
+                 propensity:'model', insights:'insights', home:'overview', '':'overview'};
+  if(ALIAS[h]){ location.replace('#/'+ALIAS[h]); return {view:ALIAS[h]}; }
+  return {view:'overview'};
 }
 function renderNav(){
   const r = currentRoute();
@@ -968,7 +982,7 @@ function deskList(){
    never in what the record actually says. */
 function auditCols(compact){
   const cols = [
-    {key:'ts', label:'Timestamp', type:'time', w:compact?'132px':'150px',
+    {key:'ts', label:'Timestamp', type:'time', w:compact?'150px':'156px',
      render:r=>`<span class="mono">${fmtTime(r.ts)}</span>`, sort:r=>r.ts},
     {key:'stage', label:'Stage', type:'enum', w:compact?'146px':'150px',
      render:r=>chip(r.stage, AUD_PAIR[r.stage]||PAIR.mute),
@@ -979,7 +993,7 @@ function auditCols(compact){
     {key:'rule_fired', label:'Rule fired', type:'text', w:compact?'204px':'222px',
      render:r=>`<span class="mono" style="color:var(--ink)">${esc(r.rule_fired||'—')}</span>`,
      foot:rows=>`<b>${new Set(rows.map(r=>r.rule_fired)).size}</b> rules`},
-    {key:'fallback_used', label:'Fallback', type:'enum', w:compact?'74px':'104px',
+    {key:'fallback_used', label:'Fallback', type:'enum', w:compact?'70px':'96px',
      render:r=>r.fallback_used?chip('FALLBACK',PAIR.warn):'<span style="color:var(--ink-3)">—</span>',
      sort:r=>r.fallback_used?1:0,
      foot:rows=>`<b>${rows.filter(r=>r.fallback_used).length}</b> used`},
@@ -1024,9 +1038,9 @@ function accountCols(){
   return [
     {key:'name', label:'Account', type:'text', w:'184px',
      render:r=>`<span class="cell-id">${sq(r.name)}<span class="nm">${esc(r.name)}</span></span>`},
-    {key:'domain', label:'Domain', type:'link', w:'150px',
+    {key:'domain', label:'Domain', type:'link', w:'126px',
      render:r=>`<span style="color:var(--brand-ink)">${esc(r.domain)}</span>`},
-    {key:'industry', label:'Industry', type:'enum', w:'162px', render:r=>chip(r.industry, industryPair(r.industry)),
+    {key:'industry', label:'Industry', type:'enum', w:'184px', render:r=>chip(r.industry, industryPair(r.industry)),
      foot:footUniq('industry')},
     {key:'employee_band', label:'Employees', type:'enum', w:'104px',
      render:r=>chip(r.employee_band, BAND_PAIR[r.employee_band])},
@@ -1035,7 +1049,7 @@ function accountCols(){
     {key:'propensity', label:'Propensity', type:'num', align:'r', w:'98px',
      sort:r=>(sc[r.id]?sc[r.id].score:-1),
      render:r=>{ const x=sc[r.id];
-       return x ? `<b style="font-weight:600;color:${x.score>=p1?'var(--hot)':'var(--ink)'}">${x.score.toFixed(4)}</b>`
+       return x ? `<b style="font-weight:600;color:${x.score>=p1?'var(--hot)':'var(--ink)'}">${fmtScore(x.score)}</b>`
                 : '<span style="color:var(--ink-3)">—</span>'; },
      foot:rows=>{ const v=rows.map(r=>sc[r.id]).filter(Boolean);
        return v.length ? `<b>${v.filter(x=>x.score>=p1).length}</b> P1` : '—'; }},
@@ -1052,7 +1066,7 @@ function accountCols(){
     {key:'open_amount', label:'Open pipeline', type:'money', align:'r', w:'114px',
      render:r=>r.open_amount?moneyK(r.open_amount):'<span style="color:var(--ink-3)">—</span>',
      foot:footMoney('open_amount')},
-    {key:'won_amount', label:'Won', type:'money', align:'r', w:'118px',
+    {key:'won_amount', label:'Won', type:'money', align:'r', w:'140px',
      render:r=>r.won_amount?`<span style="color:var(--ok)">${moneyK(r.won_amount)}</span>`:'<span style="color:var(--ink-3)">—</span>',
      foot:footMoney('won_amount')},
   ];
@@ -1077,7 +1091,7 @@ function vContacts(v){
   const cols = [
     {key:'name', label:'Contact', type:'person', w:'180px',
      render:r=>`<span class="cell-id">${sq(r.name)}<span class="nm">${esc(r.name)}</span></span>`},
-    {key:'title', label:'Title', type:'text', w:'224px', foot:footUniq('title')},
+    {key:'title', label:'Title', type:'text', w:'212px', foot:footUniq('title')},
     {key:'account', label:'Account', type:'text', w:'162px',
      render:r=>`<span style="font-weight:500">${esc(r.account)}</span>`, foot:footUniq('account')},
     {key:'email', label:'Email', type:'link', w:'252px',
@@ -1119,7 +1133,10 @@ function vOpps(v){
          ? ` <span class="chip" style="background:var(--bg-active);color:var(--ink-3)" title="closed after the scoring clock — outside what the model was allowed to see">post-clock</span>`
          : '');
      },
-     foot:rows=>`<b>${rows.filter(r=>!r.closed_at).length}</b> still open`},
+     foot:rows=>{
+       const post = rows.filter(r=>r.closed_at && parseTs(r.closed_at) > parseTs(S.stats.as_of)).length;
+       return `<b>${rows.filter(r=>!r.closed_at).length}</b> open · <b>${post}</b> post-clock`;
+     }},
     {key:'age_days', label:'Age', type:'num', align:'r', w:'136px',
      render:r=>`${num(r.age_days)}<span style="color:var(--ink-3)">d ${r.closed_at?'to close':'open'}</span>`,
      foot:rows=>{
@@ -1143,10 +1160,14 @@ function vAudit(v){
   [['RECORDS', num(S.audit.total), 'every decision, append-only'],
    ['STAGES', Object.keys(S.audit.stages).length, 'distinct pipeline stages'],
    ['FALLBACKS', num(S.audit.fallbacks), `${(S.audit.fallbacks/Math.max(1,S.audit.total)*100).toFixed(1)}% of records`],
-   ['TOP RULE', num(topRule[1]), topRule[0]],
+   ['TOP RULE', topRule[0], `fired ${num(topRule[1])} times`],
   ].forEach(([kk,vv,ss])=>{
     const c = el('div','kvc');
-    c.innerHTML = `<div class="k">${esc(kk)}</div><div class="v">${esc(String(vv))}</div><div class="s" title="${esc(ss)}">${esc(ss)}</div>`;
+    const big = String(vv);
+    c.innerHTML = `<div class="k">${esc(kk)}</div>
+      <div class="v" style="${big.length>12?'font-size:13px;letter-spacing:0;font-family:var(--mono);word-break:break-all':''}"
+        title="${esc(big)}">${esc(big)}</div>
+      <div class="s" title="${esc(ss)}">${esc(ss)}</div>`;
     kv.appendChild(c);
   });
   k.style.flex='none';
@@ -1181,7 +1202,10 @@ function leadOutcome(leadId){
 }
 const OUT_PAIR = {applied:PAIR.ok, rejected:PAIR.bad, pending:PAIR.warn, review:PAIR.cool};
 function vQueue(v){
-  topbar('Routing Queue', `${S.leads.length} inbound leads awaiting a routing decision`, []);
+  const openLeads = S.leads.filter(l=>{ const o=leadOutcome(l.lead_id);
+    return !o.status || o.status==='pending' || o.status==='review'; }).length;
+  topbar('Routing Queue',
+    `${S.leads.length} inbound leads · ${openLeads} still awaiting a decision`, []);
   v.innerHTML='';
   const cols = [
     {key:'company', label:'Company', type:'text', w:'176px',
@@ -1189,9 +1213,9 @@ function vQueue(v){
     {key:'lead_id', label:'Lead ID', type:'mono', w:'88px', render:r=>`<span class="mono">${esc(r.lead_id)}</span>`},
     {key:'contact_name', label:'Contact', type:'person', w:'150px',
      render:r=>`<span>${esc(r.contact_name)}<span style="color:var(--ink-3)"> · ${esc(r.title)}</span></span>`},
-    {key:'country', label:'Region', type:'enum', w:'132px',
+    {key:'country', label:'Region', type:'enum', w:'168px',
      render:r=>chip([r.state,r.country].filter(Boolean).join(' · ')), foot:footUniq('country')},
-    {key:'notes', label:'Inbound note', type:'text',
+    {key:'notes', label:'Inbound note', type:'text', w:'320px',
      render:r=>`<span style="color:var(--ink-2)" title="${esc(r.notes)}">${esc(r.notes)}</span>`},
     {key:'status', label:'Last outcome', type:'enum', w:'118px',
      sort:r=>leadOutcome(r.lead_id).status||'~',
@@ -1210,7 +1234,7 @@ function vQueue(v){
     {key:'score', label:'Propensity', type:'num', align:'r', w:'98px',
      sort:r=>leadOutcome(r.lead_id).score,
      render:r=>{ const o=leadOutcome(r.lead_id);
-       return o.score!=null?`<b style="font-weight:600">${o.score.toFixed(4)}</b>`:'<span style="color:var(--ink-3)">—</span>'; }},
+       return o.score!=null?`<b style="font-weight:600">${fmtScore(o.score)}</b>`:'<span style="color:var(--ink-3)">—</span>'; }},
     {key:'go', label:'Action', type:'text', w:'84px',
      render:()=>`<span style="color:var(--brand);font-weight:600;display:inline-flex;align-items:center;gap:5px">${ico('i-play')}Run</span>`,
      sort:()=>0},
@@ -1250,45 +1274,37 @@ function vInsights(v){
   const reps = Object.values(repRoster());
   topbar('Routing Insights', `per-rep load derived from ${num(S.audit.total)} audit records`, []);
   v.innerHTML='';
-  const totRouted = Math.max(1, reps.reduce((a,x)=>a+x.routed,0));
   const cols = [
-    {key:'name', label:'Rep', type:'person', w:'190px',
+    {key:'name', label:'Rep', type:'person', w:'176px',
      render:r=>`<span class="cell-id">${sq(r.name)}<span class="nm">${esc(r.name)}</span></span>`},
-    {key:'territory', label:'Territory', type:'enum', w:'132px',
+    {key:'territory', label:'Territory', type:'enum', w:'120px',
      render:r=>chip(r.territory, TERR_PAIR[r.territory]), foot:footUniq('territory')},
-    {key:'available', label:'Availability', type:'enum', w:'134px',
+    {key:'available', label:'Availability', type:'enum', w:'126px',
      render:r=>r.available?chip('AVAILABLE',PAIR.ok):chip('ON VACATION',PAIR.bad), sort:r=>r.available?1:0,
      foot:rows=>`<b>${rows.filter(r=>!r.available).length}</b> unavailable`},
-    {key:'routed', label:'Routed', type:'num', align:'r', w:'92px', foot:footSum('routed')},
-    {key:'applied', label:'Applied', type:'num', align:'r', w:'92px',
+    {key:'routed', label:'Routed', type:'num', align:'r', w:'86px', foot:footSum('routed')},
+    {key:'applied', label:'Applied', type:'num', align:'r', w:'86px',
      render:r=>r.applied?`<span style="color:var(--ok);font-weight:600">${r.applied}</span>`:'<span style="color:var(--ink-3)">0</span>',
      foot:footSum('applied')},
-    {key:'skipped', label:'Skipped', type:'num', align:'r', w:'92px',
+    {key:'skipped', label:'Skipped', type:'num', align:'r', w:'86px',
      render:r=>r.skipped?`<span style="color:var(--bad);font-weight:600">${r.skipped}</span>`:'<span style="color:var(--ink-3)">0</span>',
      foot:footSum('skipped')},
-    {key:'share', label:'Share of routed', type:'num', w:'194px',
-     render:r=>{
-       const p = r.routed/totRouted*100;
-       return `<span style="display:flex;align-items:center;gap:8px">
-         <span style="flex:1;height:6px;border-radius:3px;background:var(--bg-active);overflow:hidden">
-           <i style="display:block;height:100%;width:${p.toFixed(1)}%;background:var(--brand)"></i></span>
-         <span class="num" style="font-size:11px;color:var(--ink-2);width:34px;text-align:right">${p.toFixed(0)}%</span></span>`;
-     }, sort:r=>r.routed},
-    {key:'book_accounts', label:'Accounts', type:'num', align:'r', w:'96px',
-     sort:r=>terrBook(r.territory).accounts, render:r=>num(terrBook(r.territory).accounts),
-     foot:rows=>`<b>Σ</b> ${num(S.accounts.length)}`},
-    {key:'book_open', label:'Territory pipeline', type:'money', align:'r', w:'140px',
-     sort:r=>terrBook(r.territory).open, render:r=>money(terrBook(r.territory).open),
-     foot:rows=>`<b>Σ</b> ${money(S.accounts.reduce((a,x)=>a+x.open_amount,0))}`},
-    {key:'book_acts', label:'Acts 30d', type:'num', align:'r', w:'96px',
-     sort:r=>terrBook(r.territory).acts, render:r=>num(terrBook(r.territory).acts),
-     foot:rows=>`<b>Σ</b> ${num(S.accounts.reduce((a,x)=>a+x.activities_30d,0))}`},
-    {key:'leads', label:'Leads handled', type:'text', w:'146px',
+    {key:'book_accounts', label:'Accounts / rep', type:'num', align:'r', w:'118px',
+     sort:r=>repShare(r).accounts,
+     render:r=>r.available?repShare(r).accounts.toFixed(1)
+                          :'<span style="color:var(--ink-3)">—</span>',
+     foot:rows=>`<b>${num(S.accounts.length)}</b> accounts total`},
+    {key:'book_open', label:'Pipeline / rep', type:'money', align:'r', w:'134px',
+     sort:r=>repShare(r).open,
+     render:r=>r.available?money(repShare(r).open)
+                          :'<span style="color:var(--ink-3)">—</span>',
+     foot:rows=>`<b>${money(S.accounts.reduce((a,x)=>a+x.open_amount,0))}</b> total`},
+    {key:'leads', label:'Leads handled', type:'text', w:'168px',
      sort:r=>repLeads(r.name).length,
      render:r=>{ const L=repLeads(r.name);
        return L.length ? L.map(x=>`<span class="chip" style="background:var(--bg-active);color:var(--ink-2)">${esc(x)}</span>`).join(' ')
                        : '<span style="color:var(--ink-3)">none</span>'; }},
-    {key:'last_ts', label:'Last touch', type:'time', w:'150px',
+    {key:'last_ts', label:'Last touch', type:'time', w:'156px',
      render:r=>r.last_ts?`<span class="mono">${fmtTime(r.last_ts)}</span>`:'<span style="color:var(--ink-3)">never</span>',
      sort:r=>r.last_ts},
   ];
@@ -1296,9 +1312,9 @@ function vInsights(v){
   const host=el('div'); host.style.cssText='flex:1;display:flex;flex-direction:column;min-height:0';
   v.appendChild(host);
   renderTable(host,'insights',cols,reps,{unit:'reps', sortKey:'routed', sortDir:'desc',
-    hint:'load is derived from the append-only log, not stored per rep'});
+    hint:'load from the log; book share splits each territory across its live reps'});
 }
-/* The real book behind a rep's territory, from the account rollups. */
+/* The book behind a rep's territory, from the account rollups. */
 const _tb = {};
 function terrBook(t){
   if(!_tb[t]){
@@ -1307,6 +1323,14 @@ function terrBook(t){
               acts:a.reduce((s,x)=>s+x.activities_30d,0)};
   }
   return _tb[t];
+}
+/* A rep's SHARE of that book. Printing the territory total on each rep row
+   made the visible column sum to twice its own footer; accounts have no owner
+   field, so the honest derivation is the territory split across its live reps. */
+function repShare(r){
+  const t = terrBook(r.territory);
+  const live = Math.max(1, (S.terr.territories[r.territory]||[]).filter(x=>x.available).length);
+  return {accounts: t.accounts/live, open: t.open/live, acts: t.acts/live};
 }
 /* Which leads a rep actually touched, from routing + applied records. */
 function repLeads(name){
@@ -1330,7 +1354,8 @@ function vRoundRobin(v){
     const sec = el('div','sec');
     sec.innerHTML = `<div class="sec-h"><h3>${esc(terr.toUpperCase())}</h3>
       ${chip(reps.length+' reps', PAIR.mute)}
-      ${cursor!=null?chip('CURSOR '+cursor, PAIR.brand):chip('NOT YET ROTATED', PAIR.mute)}
+      ${cursor!=null?chip('RR CURSOR '+cursor, PAIR.brand)
+                    :chip('ASSIGNED BY TERRITORY MAP', PAIR.mute)}
       <div class="sp"></div>
       <span class="hint">${num(accs.length)} accounts · ${moneyK(accs.reduce((s,a)=>s+a.open_amount,0))} open pipeline · ${num(accs.reduce((s,a)=>s+a.activities_30d,0))} activities in 30d</span></div>`;
     const grid = el('div','hl'); grid.style.gridTemplateColumns='repeat(2,1fr)';
@@ -1384,7 +1409,7 @@ function vTerritories(v){
     {key:'opps', label:'Opps', type:'num', align:'r', w:'80px', foot:footSum('opps')},
     {key:'open_amount', label:'Open pipeline', type:'money', align:'r', w:'126px',
      render:r=>money(r.open_amount), foot:footMoney('open_amount')},
-    {key:'won_amount', label:'Won', type:'money', align:'r', w:'126px',
+    {key:'won_amount', label:'Won', type:'money', align:'r', w:'146px',
      render:r=>`<span style="color:var(--ok)">${money(r.won_amount)}</span>`, foot:footMoney('won_amount')},
     {key:'reps', label:'Coverage', type:'text', w:'186px',
      sort:r=>r.reps-r.unavailable,
@@ -1397,7 +1422,12 @@ function vTerritories(v){
      foot:rows=>`<b>avg</b> ${(rows.reduce((a,r)=>a+r.per_rep_accounts,0)/rows.length).toFixed(1)}`},
     {key:'per_rep_open', label:'Pipeline / rep', type:'money', align:'r', w:'136px',
      sort:r=>r.per_rep_open,
-     render:r=>`<span style="${r.unavailable?'color:var(--bad);font-weight:600':''}">${money(r.per_rep_open)}</span>`,
+     render:r=>{
+       const worst = r.per_rep_open === Math.max(...rows.map(x=>x.per_rep_open));
+       return `<span style="${worst?'color:var(--bad);font-weight:600':''}"
+         title="${r.unavailable?r.away.join(', ')+' away, so this splits across fewer reps':''}"
+         >${money(r.per_rep_open)}</span>`;
+     },
      foot:rows=>`<b>max</b> ${money(Math.max(...rows.map(r=>r.per_rep_open)))}`},
   ];
   const h=el('div','phead');
@@ -1486,7 +1516,7 @@ function vModel(v){
       {key:'account', label:'Account', type:'text', w:'190px',
        render:r=>`<span class="cell-id">${sq(r.account)}<span class="nm">${esc(r.account)}</span></span>`},
       {key:'score', label:'Propensity', type:'num', align:'r', w:'112px',
-       render:r=>`<b style="font-weight:600;color:${r.score>=p1?'var(--hot)':'var(--ink)'}">${r.score.toFixed(4)}</b>`,
+       render:r=>`<b style="font-weight:600;color:${r.score>=p1?'var(--hot)':'var(--ink)'}">${fmtScore(r.score)}</b>`,
        foot:footAvg('score',4)},
       {key:'band', label:'Rank', type:'num', w:'168px',
        render:r=>`<span style="display:flex;align-items:center;gap:8px">
@@ -1717,7 +1747,7 @@ function leadOverview(pad, run, s, ctx, prop, applied, rejected){
   /* Highlights — six real numbers */
   const hl = el('div','hl');
   const cards = [];
-  if(sS) cards.push(['i-chart','Propensity', sS.decision.propensity_score.toFixed(4), '',
+  if(sS) cards.push(['i-chart','Propensity', fmtScore(sS.decision.propensity_score), '',
       `${sS.rule_fired} · holdout AUC ${fmtAuc()}`]);
   if(rS) cards.push(['i-bolt','Priority', rS.decision.priority, `SLA ${rS.decision.sla_minutes}m`,
       `P1 threshold is propensity ≥ ${S.terr.p1_threshold}`]);
@@ -1984,7 +2014,20 @@ function flowCanvas(run, st, ctx){
     <span class="chip" style="background:var(--bg-active);color:var(--ink-2)">${nodes.filter(n=>!n.ghost).length} nodes</span>
     <div class="sp"></div>
     <span class="pmeta">solid = path taken · dashed = branch not taken · dotted = result</span>`;
+  const key = el('div');
+  key.style.cssText = 'display:flex;align-items:center;gap:14px;padding:7px 12px;'
+    + 'border-bottom:1px solid var(--line);background:var(--bg-sunken);flex-wrap:wrap';
+  key.innerHTML = [['ok','matched / assigned'],['warn','fell back / awaiting'],
+                   ['bad','skipped / no match'],['cool','warehouse data'],
+                   ['brand','model'],['ghost','not taken']]
+    .map(([tone,label])=>{
+      const [bg,fg] = NODE_TONE[tone];
+      return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--ink-3)">
+        <span style="width:11px;height:11px;border-radius:3px;background:${bg};border:1.5px solid ${fg}"></span>
+        ${esc(label)}</span>`;
+    }).join('');
   wrap.appendChild(bar);
+  wrap.appendChild(key);
   const scroll = el('div','canvas-scroll');
   const cv = el('div','canvas');
   cv.style.width = W+'px'; cv.style.height = H+'px';
