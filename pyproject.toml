@@ -1,0 +1,26 @@
+[project]
+name = "revenue-engine"
+version = "0.1.0"
+description = "Autonomous revenue engine demo: mini-warehouse, MCP context layer, propensity model, agentic routing"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb==1.5.5",
+    "scikit-learn==1.9.0",
+    "rapidfuzz==3.14.5",
+    "joblib==1.5.3",
+    "mcp==2.0.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
