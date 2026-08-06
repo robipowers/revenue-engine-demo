@@ -229,6 +229,122 @@ def account_context_payload(account_id: int) -> dict | None:
     }
 
 
+# ---------------------------------------------------------------------------
+# Object books — the console's dense tables. Every column is a real column or
+# a real aggregate; nothing here is synthesized to fill a row.
+# ---------------------------------------------------------------------------
+
+def accounts_book() -> dict:
+    """All accounts with real rollups: engaged contacts, activity counts as of
+    the demo clock, opportunity mix, and open pipeline dollars."""
+    con = warehouse.connect()
+    try:
+        as_of = warehouse.demo_as_of()
+        rows = con.execute(
+            """
+            SELECT a.id, a.name, a.domain, a.industry, a.employee_band,
+                   a.country, a.state, a.territory,
+                   (SELECT count(*) FROM contacts c WHERE c.account_id = a.id),
+                   (SELECT count(*) FROM activities t WHERE t.account_id = a.id
+                      AND t.ts <= CAST(? AS TIMESTAMP)
+                      AND t.ts > CAST(? AS TIMESTAMP) - INTERVAL 30 DAY),
+                   (SELECT count(*) FROM activities t WHERE t.account_id = a.id),
+                   (SELECT max(t.ts) FROM activities t WHERE t.account_id = a.id
+                      AND t.ts <= CAST(? AS TIMESTAMP)),
+                   (SELECT count(*) FROM opportunities o WHERE o.account_id = a.id
+                      AND o.outcome IS NULL),
+                   (SELECT count(*) FROM opportunities o WHERE o.account_id = a.id
+                      AND o.outcome = 'won'),
+                   (SELECT count(*) FROM opportunities o WHERE o.account_id = a.id
+                      AND o.outcome = 'lost'),
+                   (SELECT coalesce(sum(o.amount), 0) FROM opportunities o
+                      WHERE o.account_id = a.id AND o.outcome IS NULL),
+                   (SELECT coalesce(sum(o.amount), 0) FROM opportunities o
+                      WHERE o.account_id = a.id AND o.outcome = 'won')
+            FROM accounts a ORDER BY a.name
+            """,
+            [as_of, as_of, as_of],
+        ).fetchall()
+    finally:
+        con.close()
+    cols = ("id", "name", "domain", "industry", "employee_band", "country",
+            "state", "territory", "contacts", "activities_30d",
+            "activities_total", "last_activity", "opps_open", "opps_won",
+            "opps_lost", "open_amount", "won_amount")
+    return {"accounts": [dict(zip(cols, r)) for r in rows], "as_of": as_of}
+
+
+def contacts_book() -> dict:
+    """Every contact, joined to its account, with real engagement counts."""
+    con = warehouse.connect()
+    try:
+        as_of = warehouse.demo_as_of()
+        rows = con.execute(
+            """
+            SELECT c.id, c.name, c.title, c.email, a.name, a.territory, a.industry,
+                   (SELECT count(*) FROM activities t WHERE t.contact_id = c.id
+                      AND t.ts <= CAST(? AS TIMESTAMP)),
+                   (SELECT max(t.ts) FROM activities t WHERE t.contact_id = c.id
+                      AND t.ts <= CAST(? AS TIMESTAMP))
+            FROM contacts c JOIN accounts a ON a.id = c.account_id
+            ORDER BY a.name, c.name
+            """,
+            [as_of, as_of],
+        ).fetchall()
+    finally:
+        con.close()
+    cols = ("id", "name", "title", "email", "account", "territory", "industry",
+            "activities", "last_activity")
+    return {"contacts": [dict(zip(cols, r)) for r in rows], "as_of": as_of}
+
+
+def opportunities_book() -> dict:
+    """Every opportunity with its account, stage, amount and real age in days."""
+    con = warehouse.connect()
+    try:
+        as_of = warehouse.demo_as_of()
+        rows = con.execute(
+            """
+            SELECT o.id, a.name, a.territory, a.industry, o.stage, o.amount,
+                   o.outcome, o.created_at, o.closed_at,
+                   date_diff('day', o.created_at,
+                             coalesce(o.closed_at, CAST(? AS TIMESTAMP)))
+            FROM opportunities o JOIN accounts a ON a.id = o.account_id
+            ORDER BY o.amount DESC
+            """,
+            [as_of],
+        ).fetchall()
+    finally:
+        con.close()
+    cols = ("id", "account", "territory", "industry", "stage", "amount",
+            "outcome", "created_at", "closed_at", "age_days")
+    return {"opportunities": [dict(zip(cols, r)) for r in rows], "as_of": as_of}
+
+
+def audit_book(runs_dir=None) -> dict:
+    """The full append-only decision log for this runs_dir, newest first.
+
+    Returned verbatim from disk (no re-derivation) so the table on screen is
+    literally the governance artifact an auditor would read.
+    """
+    records = _parse_records(_audit_lines(runs_dir))
+    stages: dict[str, int] = {}
+    rules: dict[str, int] = {}
+    fallbacks = 0
+    for rec in records:
+        stages[rec.get("stage") or "?"] = stages.get(rec.get("stage") or "?", 0) + 1
+        rules[rec.get("rule_fired") or "?"] = rules.get(rec.get("rule_fired") or "?", 0) + 1
+        if rec.get("fallback_used"):
+            fallbacks += 1
+    return {
+        "records": list(reversed(records)),
+        "total": len(records),
+        "stages": stages,
+        "rules": rules,
+        "fallbacks": fallbacks,
+    }
+
+
 def _read_rotation(runs_dir) -> dict:
     """Rotation positions straight off runs/routing_state.json (read-only —
     unlike routing._load_state this never appends an audit record)."""
@@ -394,6 +510,14 @@ class RelayHandler(BaseHTTPRequestHandler):
             self._send_json(200, warehouse_stats(self.runs_dir))
         elif path == "/api/desk":
             self._send_json(200, desk_state(self.runs_dir))
+        elif path == "/api/accounts":
+            self._send_json(200, accounts_book())
+        elif path == "/api/contacts":
+            self._send_json(200, contacts_book())
+        elif path == "/api/opportunities":
+            self._send_json(200, opportunities_book())
+        elif path == "/api/audit":
+            self._send_json(200, audit_book(self.runs_dir))
         elif path == "/favicon.ico":
             self.send_response(204)
             self.send_header("Content-Length", "0")

@@ -199,3 +199,73 @@ def test_unknown_lead_404_and_bad_decision_400(server):
     status, data = _post(server, "/api/approve",
                          {"lead": "lead_001", "decision": "maybe"})
     assert status == 400 and "error" in data
+
+
+# ---------------------------------------------------------------------------
+# Object books — the console's dense tables. These assert the payloads are
+# real warehouse reads (row counts match the warehouse, aggregates are
+# internally consistent), not shapes padded out to fill a table.
+# ---------------------------------------------------------------------------
+
+def test_accounts_book_is_real_and_complete(server):
+    status, data = _get(server, "/api/accounts")
+    assert status == 200
+    accounts = data["accounts"]
+    assert len(accounts) == 40
+    row = accounts[0]
+    for field in ("id", "name", "domain", "industry", "employee_band",
+                  "country", "territory", "contacts", "activities_30d",
+                  "activities_total", "opps_open", "opps_won", "opps_lost",
+                  "open_amount", "won_amount"):
+        assert field in row, field
+    # Sorted by name, and every territory is one the router actually knows.
+    assert [a["name"] for a in accounts] == sorted(a["name"] for a in accounts)
+    assert {a["territory"] for a in accounts} <= set(config.TERRITORIES)
+    # 30d activity is a subset of all-time activity for every account.
+    assert all(a["activities_30d"] <= a["activities_total"] for a in accounts)
+    # Rollups reconcile with the warehouse totals reported by /api/stats.
+    _, stats = _get(server, "/api/stats")
+    assert sum(a["contacts"] for a in accounts) == stats["warehouse"]["contacts"]
+    assert sum(a["activities_total"] for a in accounts) == stats["warehouse"]["activities"]
+    assert sum(a["opps_won"] for a in accounts) == stats["warehouse"]["opps_won"]
+    assert sum(a["opps_open"] for a in accounts) == stats["warehouse"]["opps_open"]
+
+
+def test_contacts_book_joins_every_contact_to_an_account(server):
+    status, data = _get(server, "/api/contacts")
+    assert status == 200
+    contacts = data["contacts"]
+    assert len(contacts) == 120
+    assert all(c["account"] and c["name"] and c["email"] for c in contacts)
+    _, acc = _get(server, "/api/accounts")
+    assert {c["account"] for c in contacts} <= {a["name"] for a in acc["accounts"]}
+
+
+def test_opportunities_book_amounts_and_age(server):
+    status, data = _get(server, "/api/opportunities")
+    assert status == 200
+    opps = data["opportunities"]
+    assert len(opps) == 80
+    amounts = [o["amount"] for o in opps]
+    assert amounts == sorted(amounts, reverse=True)  # sorted by amount desc
+    assert all(o["amount"] > 0 and o["age_days"] >= 0 for o in opps)
+    # Outcome mix matches the warehouse rollup exactly.
+    _, stats = _get(server, "/api/stats")
+    assert sum(o["outcome"] == "won" for o in opps) == stats["warehouse"]["opps_won"]
+    assert sum(o["outcome"] is None for o in opps) == stats["warehouse"]["opps_open"]
+
+
+def test_audit_book_is_the_log_verbatim_newest_first(server):
+    _post(server, "/api/run", {"lead": "lead_001", "fresh": True})
+    status, data = _get(server, "/api/audit")
+    assert status == 200
+    records = data["records"]
+    assert data["total"] == len(records) > 0
+    # Newest first, and the counts are derived from the records themselves.
+    times = [r["ts"] for r in records]
+    assert times == sorted(times, reverse=True)
+    assert sum(data["stages"].values()) == data["total"]
+    assert data["fallbacks"] == sum(1 for r in records if r.get("fallback_used"))
+    # Every record carries the governance fields the table renders.
+    assert all("stage" in r and "rule_fired" in r and "inputs_sha256" in r
+               for r in records)
