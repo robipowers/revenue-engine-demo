@@ -1,8 +1,8 @@
+.DS_Store
+**/.DS_Store
+dist/
+shots-ui/
+.pytest_cache/
 __pycache__/
 *.pyc
 .venv/
-.pytest_cache/
-*.egg-info/
-runs/
-
-# data/seed and models/ are intentionally committed — do not ignore them.
