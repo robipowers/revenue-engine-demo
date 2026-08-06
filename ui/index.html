@@ -378,9 +378,14 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 }
 @media (max-width:1100px){
   :root{--nav-w:196px}
-  .rec{grid-template-columns:264px minmax(0,1fr)}
+  .rec{grid-template-columns:272px minmax(0,1fr)}
   .hl{grid-template-columns:repeat(2,1fr)}
   .kv{grid-template-columns:repeat(2,1fr)}
+  /* give attribute values the room the narrower rail takes away */
+  .attr-k{width:100px;font-size:12px}
+  .attr-k svg{width:11.5px;height:11.5px}
+  .attr,.grp-h,.prow,.note,.rail-h{padding-left:12px;padding-right:12px}
+  .attr-v{font-size:12px}
 }
 </style>
 </head>
