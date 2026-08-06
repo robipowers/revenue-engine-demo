@@ -315,6 +315,31 @@ def connect(db_path: Path | str = SEED_DB, read_only: bool = True) -> duckdb.Duc
     return duckdb.connect(str(db_path), read_only=read_only)
 
 
+# Frozen dataset => frozen clock. The seed data never moves, so live scoring
+# against the real wall clock would decay toward zero as the calendar drifts
+# past the last recorded activity. Anchoring "now" to the dataset keeps
+# scores meaningful on any demo day. The anchor is the creation moment of
+# the newest opportunity (+1h) — the point where the freshest pre-creation
+# activity cluster is fully inside the 30-day feature window, so accounts
+# with genuinely strong recent signal score high. (max(activities.ts) was
+# considered and rejected empirically: trailing background noise pushes that
+# anchor past every activity cluster and no account can score above ~0.18.)
+_DEMO_AS_OF_CACHE: dict[str, datetime] = {}
+
+
+def demo_as_of(db_path: Path | str = SEED_DB) -> datetime:
+    """The pipeline's deterministic 'now', computed once per database."""
+    key = str(Path(db_path).resolve())
+    if key not in _DEMO_AS_OF_CACHE:
+        con = connect(db_path)
+        try:
+            latest = con.execute("SELECT max(created_at) FROM opportunities").fetchone()[0]
+        finally:
+            con.close()
+        _DEMO_AS_OF_CACHE[key] = latest + timedelta(hours=1)
+    return _DEMO_AS_OF_CACHE[key]
+
+
 def _rows_as_dicts(cursor) -> list[dict]:
     cols = [d[0] for d in cursor.description]
     return [dict(zip(cols, row)) for row in cursor.fetchall()]
