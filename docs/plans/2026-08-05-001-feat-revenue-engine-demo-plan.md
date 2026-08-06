@@ -119,7 +119,7 @@ leandata-revenue-engine-demo/
 ### U1. Warehouse schema + synthetic seed
 
 **Goal:** DuckDB star schema with believable, internally coherent synthetic data.
-**Requirements:** R1, R7. Implements KTD1, KTD4.
+**Requirements:** R1, R6 (warehouse test slice), R7. Implements KTD1, KTD4.
 **Dependencies:** none.
 **Files:** `src/revenue_engine/config.py`, `src/revenue_engine/warehouse.py`, `tests/test_warehouse.py`, `pyproject.toml`.
 **Approach:** DDL for `accounts` (~40 rows: name, domain, industry, employee_band, country/state, territory), `contacts` (~120), `activities` (~600: type, ts, contact_id), `opportunities` (~80: stage, amount, outcome won/lost, closed_at). Generator uses one fixed seed and *injects real signal*: won opportunities correlate with higher 30-day activity counts and more distinct engaged contacts. Company/person names from curated fictional lists (no "Test Corp", no lorem ipsum). Territory map lives in `config.py` (AMER-East, AMER-West, EMEA, APAC with rep rosters).
@@ -129,17 +129,17 @@ leandata-revenue-engine-demo/
 ### U2. Propensity model + model card
 
 **Goal:** Trained, persisted, deterministic logistic-regression propensity score with honest documentation.
-**Requirements:** R3, R7. Implements KTD4.
+**Requirements:** R3, R6 (model test slice), R7. Implements KTD4.
 **Dependencies:** U1.
 **Files:** `src/revenue_engine/features.py`, `src/revenue_engine/model.py`, `models/model_card.md`, `tests/test_model.py`.
-**Approach:** Features per account at scoring time: activity_count_30d, distinct_contacts_engaged, days_since_last_activity, prior_opportunity_count, employee_band (ordinal), industry_fit (binary from config list). Train on opportunity outcomes; persist with joblib; `score(features) -> 0..1`. Model card states features, training-set size, holdout AUC, and limitations plainly (synthetic data, tiny n, illustrative only) — the honesty is a deliberate interview talking point.
-**Test scenarios:** training is deterministic (same coefficients across runs); holdout AUC > 0.65 (signal injected in U1 is learnable); score is pure (same input → same output, no I/O); missing-feature input raises a clear error; model card exists and lists every feature used in `features.py`.
+**Approach:** Features: activity_count_30d, distinct_contacts_engaged, days_since_last_activity, prior_opportunity_count, employee_band (ordinal), industry_fit (binary from config list). **As-of semantics prevent leakage:** training rows compute every feature as of that opportunity's creation date (e.g., activities in the 30 days *before* opp creation); live scoring computes the same features as of now. `features.py` defines defaults for structurally-absent values (counts → 0; days_since_last_activity → documented cap of 365) so any matched account is scorable; the clear-error path is reserved for malformed input dicts. Train on opportunity outcomes; persist with joblib; `score(features) -> 0..1`. Model card states features, the as-of design, training-set size, holdout AUC, and limitations plainly (synthetic data, tiny n, illustrative only) — the honesty is a deliberate interview talking point.
+**Test scenarios:** training is deterministic (same coefficients across runs); holdout AUC > 0.65 (signal injected in U1 is learnable); no training feature uses activity timestamped after its opportunity's creation date (leakage guard); a matched account with zero activities/opportunities scores without error via defaults; score is pure (same input → same output, no I/O); malformed input dict raises a clear error; model card exists and lists every feature used in `features.py`.
 **Verification:** `pytest tests/test_model.py` green; `python -m revenue_engine.model --train` regenerates `models/propensity.joblib`.
 
 ### U3. Matching + routing + audit (deterministic core)
 
 **Goal:** The non-LLM spine: fuzzy account matching, deterministic routing rules, append-only audit.
-**Requirements:** R4 (deterministic half), R5. Implements KTD5.
+**Requirements:** R4 (deterministic half), R5, R6 (matching/routing test slice). Implements KTD5.
 **Dependencies:** U1.
 **Files:** `src/revenue_engine/matching.py`, `src/revenue_engine/routing.py`, `src/revenue_engine/audit.py`, `tests/test_matching.py`, `tests/test_routing.py`.
 **Approach:** Matching: normalize (lowercase, strip suffixes like Inc/LLC), rapidfuzz token-set ratio against account names + exact domain match shortcut; policy: ≥90 auto-match, 70–89 ambiguous (→ judgment step in U4), <70 no-match (new-account path). Routing: territory from lead country/state via config map → round-robin among that territory's reps (counter persisted in `runs/`) → SLA priority tier from score (≥0.7 = P1/15-min SLA, else P2). Audit: `audit.append(stage, lead_id, inputs, decision, rule_fired, fallback_used)` writing JSONL with input hash + ISO timestamp.
@@ -149,11 +149,11 @@ leandata-revenue-engine-demo/
 ### U4. Agentic pipeline: LLM judgment steps, guardrails, HITL gate
 
 **Goal:** The full workflow wired end to end with optional LLM judgment and a blocking human gate.
-**Requirements:** R4, R5, R7. Implements KTD3, KTD6.
+**Requirements:** R4, R5, R6 (pipeline/guardrail test slice), R7. Implements KTD3, KTD6.
 **Dependencies:** U2, U3.
 **Files:** `src/revenue_engine/pipeline.py`, `src/revenue_engine/demo.py`, `data/inbound/lead_001.json` (clean), `lead_002.json` (messy name → judgment step), `lead_003.json` (no match), `tests/test_pipeline.py`.
-**Approach:** `pipeline.run(lead_path, llm=False)` orchestrates match → enrich (warehouse context) → score → route → gate. Judgment steps fire only in the ambiguous band: (a) company-name tie-break, (b) one-line intent summary from the lead's free-text notes. With `--llm` + `ANTHROPIC_API_KEY`: call Anthropic with a constrained prompt (choose from candidate list only / summarize ≤20 words); any error, timeout, or out-of-bounds response falls through to the deterministic fallback (highest rapidfuzz score; keyword intent rules) — the LLM can never expand its own action space. Without the flag/key: fallback path runs directly. Gate: pipeline writes `pending_approval` audit record and prints the proposed assignment; `--approve` (or interactive confirm) writes `assignment_applied`; rejection writes `routed_to_review`. **Execution note:** verify the no-network guarantee with a test that runs the full pipeline with sockets blocked.
-**Test scenarios:** clean lead runs end to end offline with `fallback_used: false` on non-judgment stages and no `pending` leak; messy-name lead triggers the judgment step and resolves via fallback when no key present (`fallback_used: true` in audit); LLM mock returning an out-of-candidate-list answer is rejected and fallback fires (guardrail); pipeline with sockets disabled completes fully (offline guarantee); assignment is NOT applied without approval (gate blocks); `--approve` applies and audits it; no-match lead exits via new-account path with audit record; every stage of a full run appears in audit in order.
+**Approach:** `pipeline.run(lead_path, llm=False)` orchestrates match → enrich (warehouse context) → score → route → gate. Two decoupled judgment steps: (a) company-name tie-break fires only in the 70–89 ambiguous match band; (b) one-line intent summary fires for any lead with non-empty free-text notes — so every demo lead exercises the AI-with-guardrails story. `demo.py` supports `--fresh`: clears `runs/` round-robin state (never the audit log) before the run so rehearsal and live demo produce identical assignments; the README script leads with it. With `--llm` + `ANTHROPIC_API_KEY`: call Anthropic with a constrained prompt (choose from candidate list only / summarize ≤20 words); any error, timeout, or out-of-bounds response falls through to the deterministic fallback (highest rapidfuzz score; keyword intent rules) — the LLM can never expand its own action space. Without the flag/key: fallback path runs directly. Gate: pipeline writes `pending_approval` audit record and prints the proposed assignment; `--approve` (or interactive confirm) writes `assignment_applied`; rejection writes `routed_to_review`. **Execution note:** verify the no-network guarantee with a test that runs the full pipeline with sockets blocked.
+**Test scenarios:** clean lead runs end to end offline, gets an intent summary via keyword fallback (`fallback_used: true` on that stage when no key present), no `pending` leak; two `--fresh` runs of the same lead produce identical assignments (replayability); messy-name lead triggers the tie-break judgment step and resolves via fallback when no key present (`fallback_used: true` in audit); LLM mock returning an out-of-candidate-list answer is rejected and fallback fires (guardrail); pipeline with sockets disabled completes fully (offline guarantee); assignment is NOT applied without approval (gate blocks); `--approve` applies and audits it; no-match lead exits via new-account path with audit record; every stage of a full run appears in audit in order.
 **Verification:** `pytest tests/test_pipeline.py` green offline; `python -m revenue_engine.demo data/inbound/lead_002.json` prints staged run + audit tail in <30s.
 
 ### U5. MCP server + README demo script
@@ -164,7 +164,7 @@ leandata-revenue-engine-demo/
 **Files:** `src/revenue_engine/mcp_server.py`, `tests/test_mcp_server.py`, `README.md`.
 **Approach:** FastMCP server with three read tools: `lookup_account(query)` (name or domain → id + summary), `account_context(account_id)` (contacts, last-10 activities, open opportunities, current score), `territory_rules()` (map + rosters + SLA tiers). Tools call the same `warehouse.py` helpers the pipeline uses — one context layer, two consumers. README: quickstart (`uv sync` or `pip install -e .`, rebuild, train, run demo), the 5-minute demo script (which lead to run, what to say at each stage, where the audit trail is), architecture paragraph mapping each component to the JD's language.
 **Test scenarios:** each tool invoked in-process returns the documented shape; `lookup_account` on a fuzzy name returns ranked candidates; `account_context` on an invalid id returns a structured error (not a traceback); server module imports and registers exactly 3 tools.
-**Verification:** `pytest tests/test_mcp_server.py` green; `mcp dev src/revenue_engine/mcp_server.py` starts and lists 3 tools; README demo script executed start-to-finish once by the implementer in under 5 minutes.
+**Verification:** `pytest tests/test_mcp_server.py` green (the binding automated gate — in-process registration + tool-shape tests); README demo script executed start-to-finish once by the implementer in under 5 minutes. `mcp dev src/revenue_engine/mcp_server.py` is an optional manual smoke-check only (requires `mcp[cli]` + Node/npx and may fetch the Inspector over the network) — excluded from automated pass criteria.
 
 ---
 
@@ -177,14 +177,14 @@ leandata-revenue-engine-demo/
 
 ## Definition of Done
 
-All Verification Contract gates pass; README demo script is accurate against the shipped behavior; audit JSONL from a demo run shows every stage with rule fired and fallback flags; repo is clean (no generated artifacts committed except `models/propensity.joblib` + `model_card.md`, which ship for zero-setup demos).
+All Verification Contract gates pass; README demo script is accurate against the shipped behavior; audit JSONL from a demo run shows every stage with rule fired and fallback flags; repo is clean (no generated artifacts committed except `data/seed/warehouse.duckdb`, `models/propensity.joblib`, and `model_card.md`, which ship for zero-setup demos — the committed warehouse must match a fresh `--rebuild` by row hashes).
 
 ---
 
 ## Risks & Dependencies
 
 - **Time risk (interview Mon):** U1–U4 are the demo-critical path; U5's MCP server is the JD's keyword but the demo survives without it live (talk track can show the code). Finn should land units in order.
-- **`mcp` SDK API drift:** pin the version in `pyproject.toml`; tools are tested in-process so the demo doesn't depend on client tooling.
+- **Dependency drift:** pin exact versions of ALL runtime deps in `pyproject.toml` (`mcp`, `scikit-learn`, `duckdb`, `rapidfuzz`, `joblib`) — the committed `propensity.joblib` is version-coupled to the pinned scikit-learn; tools are tested in-process so the demo doesn't depend on client tooling.
 - **Synthetic-data credibility:** guarded by U1's signal test and curated name lists; critic eyes come later via the separate gauntlet pass on any UI.
 - **Sockets-blocked test portability (macOS):** if socket-blocking proves flaky, substitute an "assert no `anthropic` client constructed" spy — the guarantee, not the mechanism, is the requirement.
 
