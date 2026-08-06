@@ -213,4 +213,48 @@ its last row.** If a card would, it gets more real data or it gets removed.
 6. 1024px pass.
 
 Serial only — `ui/index.html` is a single file and parallel builders would clobber
-each other. Critics may run in parallel.
+each other. Critics may run in parallel, but the file must not be edited while a
+critic is taking screenshots or it is judging a moving target.
+
+---
+
+## 7. Rules learned from the critic rounds (do not regress these)
+
+**Icons must carry an intrinsic size.** `ico()` emits `width="14" height="14"`.
+An `<svg>` with no width/height falls back to the replaced-element default of
+**300×150**, so any icon that happens to miss a CSS size rule silently inflates
+its row. This produced 156px rows in the Routing Queue and a full-size briefcase
+in the rail before it was caught.
+
+**Sticky headers need the right scrolling ancestor.** `position:sticky` on
+`thead th` only engages if the nearest scrolling ancestor is the element the
+header lives in. `.tw` has `overflow:auto`, so the page-level `.view` scroll
+never pinned anything. Table pages add `.view-table`, which hands scrolling to
+`.tw`. Any new long table must do the same.
+
+**No JS coercion artifact may reach the screen.** `safe()` strips
+`undefined` / `NaN` / `[object Object]` and warns. Two real cases: the
+`assignment_applied` audit record genuinely carries no `sla_minutes`, and
+`config.SLA_MINUTES` is a per-tier map `{P1:15, P2:240}`, not a scalar. A
+fabricated-looking value inside an audit row destroys the governance premise.
+
+**A column whose every row holds the same value is not a column.** Accounts
+shipped `Contacts` (3 on all 40 rows) and `Open` (1 on all 40). Both were cut
+for propensity and days-since from the score book. Check variance before adding
+a column.
+
+**One tint pool per dimension.** Territory, employee band and industry each own
+a disjoint palette (4 fixed hues / one ordinal ramp / a separate multi-hue pool).
+Sharing one pool made a single tint mean three unrelated things across one row.
+
+**Do not pad the audit log.** It had 485 records but only 25 distinct decisions —
+pure dev churn from replaying 3 leads. It is reseeded to a real governance story
+(lead_001 approved, lead_002 rejected, lead_003 routed to review) and archived
+under `runs/_dev_archive/`. There are exactly **3 real inbound leads**; inventing
+more to make the table look busy is the one thing that would kill the demo.
+Note that each `?demo=` open appends a fresh run, so reseed before final capture.
+
+**Flow edges state conditions, not results.** A solid labeled edge names the
+condition that routed the record down that path (`Match`, `No`, `P1 · score ≥ 0.7`,
+`Round Robin again`). Result cards hang off **dashed** connectors with no label.
+`Next` is not a label. This convention must read identically across both leads.
