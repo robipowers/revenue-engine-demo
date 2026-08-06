@@ -64,6 +64,9 @@ def match_account(con, name: str | None = None, domain: str | None = None) -> Ma
         }
         for acct in search_accounts_by_name(con)
     ]
+    if not scored:
+        # Empty accounts table: nothing to match against — new-account path.
+        return MatchResult(status="no_match")
     scored.sort(key=lambda c: (-c["score"], c["account_id"]))
     best = scored[0]
 

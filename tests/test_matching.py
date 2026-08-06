@@ -67,6 +67,22 @@ def test_below_70_returns_no_match(con):
     assert not result.candidates
 
 
+def test_empty_accounts_table_returns_no_match(tmp_path):
+    """An empty warehouse must yield a structured no_match, not IndexError."""
+    path = tmp_path / "empty.duckdb"
+    setup = duckdb.connect(str(path))
+    setup.execute(warehouse.DDL)
+    setup.close()
+    empty_con = duckdb.connect(str(path), read_only=True)
+    try:
+        result = matching.match_account(empty_con, name="Anything Corp")
+        assert result.status == "no_match"
+        assert result.account_id is None
+        assert not result.candidates
+    finally:
+        empty_con.close()
+
+
 def test_unknown_domain_falls_through_to_fuzzy(con):
     result = matching.match_account(con, name="Ledgerlyne Inc.", domain="ledgerlyne.example")
     assert result.status == "matched"

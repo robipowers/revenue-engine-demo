@@ -119,3 +119,49 @@ def test_territory_rules_shape():
     assert out["sla_tiers"]["P2"]["sla_minutes"] == 240
     assert out["sla_tiers"]["P1"]["min_propensity_score"] == 0.7
     assert out["default_territory"] == "AMER-West"
+
+
+# ---------------------------------------------------------------------------
+# Missing data artifacts: structured error dicts, never raw tracebacks
+# ---------------------------------------------------------------------------
+
+def test_tools_missing_warehouse_return_structured_error(tmp_path, monkeypatch):
+    from revenue_engine import warehouse
+
+    real_connect = warehouse.connect
+    missing_db = tmp_path / "nowhere" / "warehouse.duckdb"
+    monkeypatch.setattr(warehouse, "connect", lambda *a, **k: real_connect(missing_db))
+
+    out = mcp_server.lookup_account("meterhouse.io")
+    assert out["error"]["code"] == "artifacts_not_found"
+    assert "REVENUE_ENGINE_ROOT" in out["error"]["message"]
+
+    out = mcp_server.account_context(1)
+    assert out["error"]["code"] == "artifacts_not_found"
+    assert "REVENUE_ENGINE_ROOT" in out["error"]["message"]
+
+
+def test_account_context_missing_model_returns_structured_error(monkeypatch):
+    from revenue_engine import model
+
+    account_id = mcp_server.lookup_account("meterhouse.io")["account"]["id"]
+    monkeypatch.setattr(mcp_server, "_MODEL_CACHE", {})
+
+    def _missing(*args, **kwargs):
+        raise FileNotFoundError("models/propensity.joblib is missing")
+
+    monkeypatch.setattr(model, "load", _missing)
+    out = mcp_server.account_context(account_id)
+    assert out["error"]["code"] == "artifacts_not_found"
+    assert "REVENUE_ENGINE_ROOT" in out["error"]["message"]
+
+
+def test_missing_artifacts_preflight_names_absent_files(monkeypatch, tmp_path):
+    from revenue_engine import config, model
+
+    monkeypatch.setattr(config, "SEED_DB", tmp_path / "absent.duckdb")
+    monkeypatch.setattr(model, "MODEL_PATH", tmp_path / "absent.joblib")
+    problems = mcp_server._missing_artifacts()
+    assert len(problems) == 2
+    assert "absent.duckdb" in problems[0]
+    assert "absent.joblib" in problems[1]

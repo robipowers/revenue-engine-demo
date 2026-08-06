@@ -32,7 +32,7 @@ uv run --extra llm python -m revenue_engine.demo data/inbound/lead_001.json --ll
 
 Without the key or the package every step uses its deterministic fallback and nothing touches the network. A missing package is reported distinctly (`llm_unavailable: anthropic not installed (install extra: llm)`) on stderr and in the audit trail, so it is never mistaken for an API failure.
 
-A pending run persists its proposal to `runs/pending/<lead_id>.json`. A later `--approve` or `--reject` consumes that stored proposal exactly as it was shown, without re-running the pipeline or advancing the round-robin rotation a second time.
+A pending run persists its proposal to `runs/pending/<lead_id>.json`. A later `--approve` or `--reject` consumes that stored proposal exactly as it was shown, without re-running the pipeline or advancing the round-robin rotation a second time. The disposition is then recorded to `runs/resolved/<lead_id>.json`, so repeating the same `--approve` replays the recorded outcome instead of re-running anything. A corrupt pending file fails closed: the discard is audited (`pending_discarded`) and the run stops with instructions to regenerate a fresh proposal, so an unseen proposal can never be auto-applied.
 
 ## The 5-minute demo script
 

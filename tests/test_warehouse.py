@@ -179,3 +179,14 @@ def test_query_helpers(con):
     assert 0 <= n_contacts <= 10
     n_opps = warehouse.prior_opp_count_as_of(con, sample_id, as_of)
     assert n_opps >= 0
+
+
+def test_demo_as_of_empty_opportunities_raises_clear_error(tmp_path):
+    """No opportunities means no demo clock anchor: fail with a rebuild hint,
+    never a bare TypeError."""
+    path = tmp_path / "empty.duckdb"
+    setup = duckdb.connect(str(path))
+    setup.execute(warehouse.DDL)
+    setup.close()
+    with pytest.raises(ValueError, match="rebuild"):
+        warehouse.demo_as_of(path)

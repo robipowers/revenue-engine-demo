@@ -336,6 +336,12 @@ def demo_as_of(db_path: Path | str = SEED_DB) -> datetime:
             latest = con.execute("SELECT max(created_at) FROM opportunities").fetchone()[0]
         finally:
             con.close()
+        if latest is None:
+            raise ValueError(
+                f"warehouse {db_path} has no opportunities, so no demo clock "
+                "can be anchored; rebuild with "
+                "`python -m revenue_engine.warehouse --rebuild`"
+            )
         _DEMO_AS_OF_CACHE[key] = latest + timedelta(hours=1)
     return _DEMO_AS_OF_CACHE[key]
 

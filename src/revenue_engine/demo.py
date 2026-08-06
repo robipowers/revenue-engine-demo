@@ -84,8 +84,14 @@ def main() -> None:
         print("(--fresh) routing rotation state reset; audit log untouched.\n")
 
     approve = True if args.approve else False if args.reject else None
-    result = pipeline.run(args.lead, llm=args.llm, approve=approve)
+    try:
+        result = pipeline.run(args.lead, llm=args.llm, approve=approve)
+    except ValueError as exc:
+        raise SystemExit(f"error: {exc}") from exc
 
+    if result.get("idempotent_replay"):
+        print(f"(already resolved as {result['status']}; replaying the "
+              "recorded outcome, nothing re-run)\n")
     _print_stages(result)
     _print_proposal(result)
     _print_audit_tail()

@@ -20,8 +20,10 @@ the FastMCP class to MCPServer — same decorator API.
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 
+import duckdb
 from mcp.server.mcpserver import MCPServer
 from rapidfuzz import fuzz
 
@@ -48,6 +50,25 @@ mcp = MCPServer(
 
 _MODEL_CACHE: dict[str, Any] = {}
 
+# Missing/unreadable data artifacts (seed DB, trained model): the failure
+# classes the DB-backed tools convert into a structured error dict instead
+# of leaking a raw traceback to the MCP client.
+_ARTIFACT_ERRORS = (duckdb.Error, FileNotFoundError, OSError, ValueError)
+
+_REBUILD_HINT = (
+    "rebuild with `python -m revenue_engine.warehouse --rebuild` and "
+    "`python -m revenue_engine.model --train`, or check REVENUE_ENGINE_ROOT"
+)
+
+
+def _artifacts_error(exc: Exception) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": "artifacts_not_found",
+            "message": f"data artifacts unavailable ({exc}); {_REBUILD_HINT}",
+        }
+    }
+
 
 def _model_payload() -> dict:
     if "payload" not in _MODEL_CACHE:
@@ -62,8 +83,12 @@ def lookup_account(query: str) -> dict[str, Any]:
     A domain match returns the full account record; otherwise returns
     fuzzy-name candidates ranked by the same rapidfuzz scoring the
     pipeline's matcher uses, with the matcher's thresholds attached.
+    Missing data artifacts return a structured error dict, never a traceback.
     """
-    con = warehouse.connect()
+    try:
+        con = warehouse.connect()
+    except _ARTIFACT_ERRORS as exc:
+        return _artifacts_error(exc)
     try:
         account = warehouse.get_account_by_domain(con, query)
         if account:
@@ -88,6 +113,8 @@ def lookup_account(query: str) -> dict[str, Any]:
                 "ambiguous_threshold": AMBIGUOUS_THRESHOLD,
             },
         }
+    except _ARTIFACT_ERRORS as exc:
+        return _artifacts_error(exc)
     finally:
         con.close()
 
@@ -96,8 +123,12 @@ def lookup_account(query: str) -> dict[str, Any]:
 def account_context(account_id: int) -> dict[str, Any]:
     """Full context for one account: contacts, last 10 activities, open
     opportunities, and the current propensity score (computed as of the
-    frozen demo clock). Unknown ids return a structured error dict."""
-    con = warehouse.connect()
+    frozen demo clock). Unknown ids and missing data artifacts return a
+    structured error dict."""
+    try:
+        con = warehouse.connect()
+    except _ARTIFACT_ERRORS as exc:
+        return _artifacts_error(exc)
     try:
         context = warehouse.get_account_context(con, account_id)
         if context is None:
@@ -118,6 +149,8 @@ def account_context(account_id: int) -> dict[str, Any]:
             "propensity_score": round(propensity, 4),
             "as_of": as_of.isoformat(),
         }
+    except _ARTIFACT_ERRORS as exc:
+        return _artifacts_error(exc)
     finally:
         con.close()
 
@@ -147,5 +180,21 @@ def territory_rules() -> dict[str, Any]:
     }
 
 
+def _missing_artifacts() -> list[str]:
+    """Startup preflight: name every required on-disk artifact that is absent."""
+    missing = []
+    if not config.SEED_DB.exists():
+        missing.append(f"seed warehouse: {config.SEED_DB}")
+    if not model.MODEL_PATH.exists():
+        missing.append(f"trained model: {model.MODEL_PATH}")
+    return missing
+
+
 if __name__ == "__main__":
+    problems = _missing_artifacts()
+    if problems:
+        for problem in problems:
+            print(f"missing artifact: {problem}", file=sys.stderr)
+        print(_REBUILD_HINT, file=sys.stderr)
+        raise SystemExit(1)
     mcp.run()  # stdio transport; never executed on import

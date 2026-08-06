@@ -6,9 +6,10 @@ import socket
 from datetime import datetime
 from pathlib import Path
 
+import duckdb
 import pytest
 
-from revenue_engine import pipeline, routing, warehouse
+from revenue_engine import pipeline, warehouse
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INBOUND = REPO_ROOT / "data" / "inbound"
@@ -115,10 +116,11 @@ def test_reject_routes_to_review(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_two_fresh_runs_identical(tmp_path):
-    routing.reset_state(tmp_path)
-    first = pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path)
-    routing.reset_state(tmp_path)
-    second = pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path)
+    # Separate runs_dirs: two genuinely fresh environments must produce the
+    # same assignment. (A repeated approve inside ONE runs_dir is covered by
+    # the idempotency test below and replays instead of re-running.)
+    first = pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path / "a")
+    second = pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path / "b")
     assert first["proposal"] == second["proposal"]
     assert first["score"] == second["score"]
 
@@ -338,6 +340,114 @@ def test_two_invocation_reject_consumes_pending(tmp_path):
     assert rejected["proposal"]["rep"] == pending["proposal"]["rep"]
     assert not pending_file.exists()
     assert _stages(tmp_path)[-1] == "routed_to_review"
+
+
+# ---------------------------------------------------------------------------
+# HITL state machine hardening: corrupt pending fails closed, atomic writes,
+# idempotent repeat approve, approve survives lead-file deletion
+# ---------------------------------------------------------------------------
+
+def test_corrupt_pending_fails_closed_no_auto_apply(tmp_path):
+    pending = pipeline.run(LEAD_MESSY, runs_dir=tmp_path)
+    lead_id = pending["lead_id"]
+    pending_file = tmp_path / "pending" / f"{lead_id}.json"
+    rotation_before = (tmp_path / "routing_state.json").read_bytes()
+    pending_file.write_text("{ this is not valid json")
+
+    with pytest.raises(ValueError, match="corrupt"):
+        pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path)
+
+    records = _audit_records(tmp_path)
+    stages = [r["stage"] for r in records]
+    assert "assignment_applied" not in stages, "corrupt pending must never auto-apply"
+    assert stages[-1] == "pending_discarded"
+    assert records[-1]["rule_fired"] == "corrupt_pending"
+    # Rotation state untouched: the pipeline did NOT silently re-run.
+    assert (tmp_path / "routing_state.json").read_bytes() == rotation_before
+    assert not pending_file.exists(), "the corrupt pending file is discarded"
+
+
+def test_corrupt_pending_invalid_shape_also_fails_closed(tmp_path):
+    pending = pipeline.run(LEAD_MESSY, runs_dir=tmp_path)
+    pending_file = tmp_path / "pending" / f"{pending['lead_id']}.json"
+    pending_file.write_text(json.dumps({"lead_id": pending["lead_id"], "proposal": "nope"}))
+    with pytest.raises(ValueError, match="corrupt"):
+        pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path)
+    assert "assignment_applied" not in _stages(tmp_path)
+
+
+def test_pending_and_resolved_writes_leave_no_tmp_files(tmp_path):
+    pipeline.run(LEAD_MESSY, runs_dir=tmp_path)
+    assert list((tmp_path / "pending").glob("*.tmp")) == []
+    pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path)
+    assert list((tmp_path / "resolved").glob("*.tmp")) == []
+    assert list(tmp_path.rglob("*.tmp")) == []
+
+
+def test_interrupted_pending_write_preserves_previous_proposal(tmp_path, monkeypatch):
+    """Atomic write: a crash mid-write can never truncate an existing
+    pending proposal — the temp sibling is replaced in one step."""
+    pending = pipeline.run(LEAD_MESSY, runs_dir=tmp_path)
+    lead_id = pending["lead_id"]
+    pending_file = tmp_path / "pending" / f"{lead_id}.json"
+    before = pending_file.read_text()
+
+    def _crash(src, dst):
+        raise OSError("simulated crash before replace")
+    monkeypatch.setattr(pipeline.os, "replace", _crash)
+    with pytest.raises(OSError, match="simulated crash"):
+        pipeline._store_pending(lead_id, {"rep": "Someone Else"}, tmp_path)
+    monkeypatch.undo()
+
+    # The stored proposal is exactly the one written before the crash.
+    assert json.loads(pending_file.read_text()) == json.loads(before)
+    approved = pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path)
+    assert approved["proposal"]["rep"] == pending["proposal"]["rep"]
+
+
+def test_repeat_approve_is_idempotent(tmp_path):
+    pipeline.run(LEAD_MESSY, runs_dir=tmp_path)
+    first = pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path)
+    assert first["status"] == "assignment_applied"
+    rotation_after = (tmp_path / "routing_state.json").read_bytes()
+    n_records = len(_audit_records(tmp_path))
+
+    second = pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path)
+    assert second["status"] == "assignment_applied"
+    assert second["proposal"]["rep"] == first["proposal"]["rep"]
+    assert second.get("idempotent_replay") is True
+    # Byte-identical rotation state, no new audit decisions, exactly one apply.
+    assert (tmp_path / "routing_state.json").read_bytes() == rotation_after
+    records = _audit_records(tmp_path)
+    assert len(records) == n_records
+    assert [r["stage"] for r in records].count("assignment_applied") == 1
+
+
+def test_approve_after_lead_file_deleted_applies_stored_proposal(tmp_path):
+    lead_copy = tmp_path / "inbound_lead.json"
+    lead_copy.write_text(LEAD_MESSY.read_text())
+    pending = pipeline.run(lead_copy, runs_dir=tmp_path)
+    assert pending["status"] == "pending_approval"
+    lead_copy.unlink()
+
+    approved = pipeline.run(lead_copy, approve=True, runs_dir=tmp_path)
+    assert approved["status"] == "assignment_applied"
+    assert approved["proposal"]["rep"] == pending["proposal"]["rep"]
+    assert _stages(tmp_path)[-1] == "assignment_applied"
+
+
+# ---------------------------------------------------------------------------
+# Empty warehouse: unmatched lead exits via new_account, never IndexError
+# ---------------------------------------------------------------------------
+
+def test_pipeline_empty_warehouse_exits_new_account(tmp_path):
+    db = tmp_path / "empty.duckdb"
+    con = duckdb.connect(str(db))
+    con.execute(warehouse.DDL)
+    con.close()
+    result = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path, db_path=db)
+    assert result["status"] == "new_account"
+    assert result["proposal"]["action"] == "create_account"
 
 
 # ---------------------------------------------------------------------------

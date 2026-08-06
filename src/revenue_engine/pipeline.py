@@ -44,6 +44,7 @@ LLM_MODEL = "claude-haiku-4-5"
 LLM_TIMEOUT_SECONDS = 10.0
 
 PENDING_DIRNAME = "pending"
+RESOLVED_DIRNAME = "resolved"
 
 # Lead fields that must be str or null when present (lead_id is required).
 _LEAD_STR_FIELDS = (
@@ -203,16 +204,33 @@ def validate_lead(lead) -> None:
 # HITL pending-proposal persistence
 # ---------------------------------------------------------------------------
 
+def _atomic_write_json(path: Path, payload: dict) -> None:
+    """Temp sibling + os.replace, mirroring routing._save_state: a killed
+    process can never leave a truncated JSON file behind."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, default=str))
+    os.replace(tmp, path)
+
+
 def _pending_path(lead_id: str, runs_dir: Path | str | None) -> Path:
     base = Path(runs_dir) if runs_dir else config.RUNS_DIR
     return base / PENDING_DIRNAME / f"{lead_id}.json"
 
 
-def _store_pending(lead_id: str, proposal: dict, runs_dir) -> None:
-    path = _pending_path(lead_id, runs_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"lead_id": lead_id, "proposal": proposal},
-                               indent=2, default=str))
+def _resolved_path(lead_id: str, runs_dir: Path | str | None) -> Path:
+    base = Path(runs_dir) if runs_dir else config.RUNS_DIR
+    return base / RESOLVED_DIRNAME / f"{lead_id}.json"
+
+
+def _store_pending(lead_id: str, proposal: dict, runs_dir,
+                   lead_path: Path | str | None = None) -> None:
+    payload: dict = {"lead_id": lead_id, "proposal": proposal}
+    if lead_path is not None:
+        # Remembering the source path lets a later approve find this pending
+        # proposal even after the inbound lead file is deleted or edited.
+        payload["lead_path"] = str(Path(lead_path).resolve())
+    _atomic_write_json(_pending_path(lead_id, runs_dir), payload)
 
 
 def _load_pending(lead_id: str, runs_dir) -> dict | None:
@@ -232,6 +250,32 @@ def _clear_pending(lead_id: str, runs_dir) -> None:
     path = _pending_path(lead_id, runs_dir)
     if path.exists():
         path.unlink()
+
+
+def _store_resolved(lead_id: str, disposition: str, proposal: dict, runs_dir) -> None:
+    """Record the terminal disposition so a repeated approve/reject replays
+    the recorded outcome instead of re-running anything."""
+    _atomic_write_json(
+        _resolved_path(lead_id, runs_dir),
+        {"lead_id": lead_id, "disposition": disposition, "proposal": proposal},
+    )
+
+
+def _load_resolved(lead_id: str, runs_dir) -> dict | None:
+    path = _resolved_path(lead_id, runs_dir)
+    if not path.exists():
+        return None
+    try:
+        resolved = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    if (
+        not isinstance(resolved, dict)
+        or not isinstance(resolved.get("disposition"), str)
+        or not isinstance(resolved.get("proposal"), dict)
+    ):
+        return None
+    return resolved
 
 
 def _resolve_pending(lead_id: str, pending: dict, approve: bool,
@@ -270,8 +314,89 @@ def _resolve_pending(lead_id: str, pending: dict, approve: bool,
             ),
         )
         result["status"] = "routed_to_review"
+    _store_resolved(lead_id, result["status"], proposal, runs_dir)
     _clear_pending(lead_id, runs_dir)
     return result
+
+
+def _extract_lead_id(lead_path: Path | str) -> str | None:
+    """Cheap lead_id extraction for the approve path: read the JSON and
+    require only a non-empty string lead_id — full validation happens later,
+    and only when the pipeline actually has to run."""
+    try:
+        lead = json.loads(Path(lead_path).read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(lead, dict):
+        return None
+    lead_id = lead.get("lead_id")
+    if isinstance(lead_id, str) and lead_id.strip():
+        return lead_id
+    return None
+
+
+def _find_pending_lead_id_by_path(lead_path: Path | str, runs_dir) -> str | None:
+    """When the source lead file is gone or unreadable, recover the lead_id
+    from a stored pending proposal that remembers this lead_path."""
+    base = Path(runs_dir) if runs_dir else config.RUNS_DIR
+    pending_dir = base / PENDING_DIRNAME
+    if not pending_dir.is_dir():
+        return None
+    target = str(Path(lead_path).resolve())
+    for path in sorted(pending_dir.glob("*.json")):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(data, dict) and data.get("lead_path") == target:
+            return path.stem
+    return None
+
+
+def _resolve_from_state(lead_id: str, approve: bool, llm: bool, runs_dir) -> dict | None:
+    """Approve/reject state machine, consulted BEFORE any pipeline re-run.
+
+    Returns a result dict when the stored state fully answers the request,
+    None when a fresh run is required (no pending, no resolved record).
+    Raises ValueError (fail closed) on a corrupt pending proposal: the
+    operator must never have an unseen, re-computed proposal auto-applied.
+    """
+    pending_file = _pending_path(lead_id, runs_dir)
+    if pending_file.exists():
+        pending = _load_pending(lead_id, runs_dir)
+        if pending is not None:
+            return _resolve_pending(lead_id, pending, approve, llm, runs_dir)
+        # Corrupt/invalid pending: audited discard + hard stop, never a
+        # silent re-run that would apply a proposal no human ever saw.
+        audit.append(
+            stage="pending_discarded",
+            lead_id=lead_id,
+            inputs={"pending_path": str(pending_file)},
+            decision={"reason": "corrupt_pending_proposal"},
+            rule_fired="corrupt_pending",
+            runs_dir=runs_dir,
+        )
+        pending_file.unlink()
+        raise ValueError(
+            f"pending proposal for lead {lead_id!r} was corrupt and has been "
+            "discarded (audited as pending_discarded); re-run WITHOUT "
+            "--approve/--reject to generate a fresh proposal, review it, "
+            "then approve"
+        )
+    resolved = _load_resolved(lead_id, runs_dir)
+    if resolved is not None:
+        # Idempotent replay: the disposition already happened. Return the
+        # recorded outcome unchanged — no new audit decision, no pipeline
+        # re-run, no rotation advance.
+        return {
+            "lead_id": lead_id,
+            "stages": [],
+            "llm": llm,
+            "proposal": resolved["proposal"],
+            "status": resolved["disposition"],
+            "idempotent_replay": True,
+        }
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -326,16 +451,25 @@ def run(
            dataset gets a frozen clock, so scores stay meaningful on any
            demo day instead of decaying with the real calendar.
     """
+    # HITL integrity: an approve/reject consults stored state FIRST — it
+    # consumes the STORED proposal (the one the human actually saw) or
+    # replays the recorded disposition, and only falls through to a fresh
+    # run when neither exists. Rotation state can therefore never advance
+    # twice for one lead across pending -> approve -> repeat-approve.
+    if approve is not None:
+        lead_id = _extract_lead_id(lead_path)
+        if lead_id is None:
+            # Source lead file deleted/unreadable: the stored pending
+            # proposal (which remembers its lead_path) is still approvable.
+            lead_id = _find_pending_lead_id_by_path(lead_path, runs_dir)
+        if lead_id is not None:
+            resolution = _resolve_from_state(lead_id, approve, llm, runs_dir)
+            if resolution is not None:
+                return resolution
+
     lead = json.loads(Path(lead_path).read_text())
     validate_lead(lead)
     lead_id = lead["lead_id"]
-
-    # HITL integrity: an approve/reject consumes the STORED proposal —
-    # the one the human actually saw — instead of re-running the pipeline.
-    if approve is not None:
-        pending = _load_pending(lead_id, runs_dir)
-        if pending is not None:
-            return _resolve_pending(lead_id, pending, approve, llm, runs_dir)
 
     stages: list[dict] = []
     result: dict = {"lead_id": lead_id, "stages": stages, "llm": llm}
@@ -344,6 +478,7 @@ def run(
             lead, lead_id, stages, result,
             llm=llm, approve=approve, runs_dir=runs_dir,
             db_path=db_path, model_path=model_path, as_of=as_of,
+            lead_path=lead_path,
         )
     except Exception as exc:
         # Every run terminates with a recorded outcome: a crash leaves a
@@ -374,6 +509,7 @@ def _execute(
     db_path,
     model_path,
     as_of,
+    lead_path=None,
 ) -> dict:
     con = warehouse.connect(db_path or config.SEED_DB)
     try:
@@ -573,6 +709,7 @@ def _execute(
             ),
         )
         result["status"] = "assignment_applied"
+        _store_resolved(lead_id, result["status"], proposal, runs_dir)
     elif approve is False:
         _record(
             stages,
@@ -586,9 +723,10 @@ def _execute(
             ),
         )
         result["status"] = "routed_to_review"
+        _store_resolved(lead_id, result["status"], proposal, runs_dir)
     else:
         # Persist the pending proposal so a later approve/reject acts on
         # EXACTLY this proposal instead of re-running the pipeline.
-        _store_pending(lead_id, proposal, runs_dir)
+        _store_pending(lead_id, proposal, runs_dir, lead_path=lead_path)
         result["status"] = "pending_approval"
     return result
