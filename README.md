@@ -24,6 +24,29 @@ Run the pipeline on any inbound lead:
 uv run python -m revenue_engine.demo data/inbound/lead_001.json
 ```
 
+### The lead book
+
+`data/inbound/` holds two kinds of lead. `lead_001..003` are hand-authored
+interview beats, one per matching path: a clean domain match that routes around
+a rep on vacation, a messy company name that goes ambiguous and falls through to
+the tie-break, and one that matches nothing and escalates to manual review.
+
+`lead_g*.json` are generated, so the routing surfaces have a real book behind
+them — eight reps with load instead of two, four territories that all light up,
+and an audit log whose rows differ from one another:
+
+```
+uv run python -m revenue_engine.leadgen --generate 40 --run
+uv run python -m revenue_engine.leadgen --clean
+```
+
+This fabricates **inputs only**, exactly as `warehouse --rebuild` already does
+for accounts and activities. Every score, assignment and audit record is still
+produced by running the real pipeline over those leads. The generator also
+re-checks each lead against the real matcher before keeping it, so the path mix
+it reports is measured rather than assumed, and `--clean` removes the generated
+batch without touching the three beats.
+
 Flags: `--approve` applies the proposed assignment, `--reject` sends it to human review, `--fresh` resets round-robin rotation state (never the audit log), `--llm` enables the two LLM judgment steps. The LLM path needs both `ANTHROPIC_API_KEY` and the `anthropic` package, installed via the optional extra:
 
 ```

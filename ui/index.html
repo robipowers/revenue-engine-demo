@@ -892,13 +892,15 @@ function vOverview(v){
 
   const R = el('div','pane-r');
   const rh = el('div','phead');
-  const pending = S.leads.filter(l=>{ const o=leadOutcome(l.lead_id);
-    return !o.status || o.status==='pending' || o.status==='review'; }).length;
+  const waiting = S.leads.filter(l=>{ const o=leadOutcome(l.lead_id);
+    return !o.status || o.status==='pending' || o.status==='review'; });
   rh.innerHTML = `<h2>Routing Queue</h2><div class="sp"></div>
-    <span class="pmeta">${pending} of ${S.leads.length} awaiting a decision</span>`;
+    <span class="pmeta">${waiting.length} of ${S.leads.length} awaiting a decision</span>`;
   R.appendChild(rh);
   const qw = el('div','qwrap');
-  S.leads.forEach(ld=>{
+  const QUEUE_CARDS = 4;
+  const shown = (waiting.length ? waiting : S.leads).slice(0, QUEUE_CARDS);
+  shown.forEach(ld=>{
     const c = el('div','qcard');
     const o = leadOutcome(ld.lead_id);
     const loc = [ld.state, ld.country].filter(Boolean).join(', ');
@@ -915,6 +917,14 @@ function vOverview(v){
     c.onclick = ()=>runLead(ld.file, true);
     qw.appendChild(c);
   });
+  const rest = (waiting.length ? waiting.length : S.leads.length) - shown.length;
+  if(rest > 0){
+    const more = el('button','btn');
+    more.style.cssText = 'width:100%;justify-content:center;margin-top:2px';
+    more.innerHTML = ico('i-inbox')+`<span>View all ${num(S.leads.length)} leads · ${num(rest)} more awaiting</span>`;
+    more.onclick = ()=>{ location.hash='#/queue'; };
+    qw.appendChild(more);
+  }
   R.appendChild(qw);
 
   const dh = el('div','phead'); dh.style.borderTop='1px solid var(--line)';
