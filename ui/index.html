@@ -325,7 +325,7 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 .cb+.cb{border-top:1px solid var(--line-soft)}
 .cb-k{font-family:var(--mono);font-size:11px;color:var(--ink-2);white-space:nowrap}
 .cb-t{position:relative;height:16px;background:var(--bg-sunken);border-radius:3px}
-.cb-t .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--line)}
+.cb-t .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--ink-3);opacity:.55}
 .cb-t i{position:absolute;top:3px;height:10px;border-radius:2px}
 .cb-v{font-size:11.5px;text-align:right;font-variant-numeric:tabular-nums;font-weight:550}
 .cb-raw{color:var(--ink-3)}
@@ -430,7 +430,8 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
     <div class="nav-scroll" id="navScroll"></div>
     <div class="nav-foot">
       <span class="dot-live"></span>
-      <div class="nav-foot-t">Engine live<br><span id="navClock">—</span></div>
+      <div class="nav-foot-t">Engine live<br><span id="navClock">—</span><br>
+        <span style="opacity:.8">decision clock is live</span></div>
     </div>
   </aside>
   <main class="main">
@@ -453,7 +454,7 @@ const S = { stats:null, leads:[], accounts:[], contacts:[], opps:[], audit:null,
 const $ = (s,r=document)=>r.querySelector(s);
 const el = (t,c,x)=>{const n=document.createElement(t); if(c)n.className=c; if(x!=null)n.textContent=x; return n;};
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-const ico = (id,cls)=>`<svg class="${cls||''}"><use href="#${id}"/></svg>`;
+const ico = (id,cls)=>`<svg class="${cls||''}" width="14" height="14" aria-hidden="true"><use href="#${id}"/></svg>`;
 
 /* ---------- formatting ---------- */
 const nf = new Intl.NumberFormat('en-US');
@@ -823,7 +824,7 @@ function vOverview(v){
   const openAmt = S.opps.filter(o=>o.outcome==null).reduce((a,o)=>a+o.amount,0);
   const fbRate = S.audit.total ? (S.audit.fallbacks/S.audit.total*100) : 0;
   topbar('Routing Overview',
-    `${num(S.audit.total)} decisions recorded · warehouse as of ${fmtTime(st.as_of)}`,
+    `${num(S.audit.total)} decisions recorded live · scored against the frozen warehouse of ${fmtTime(st.as_of)}`,
     [{label:'Export audit', icon:'i-dl', on:exportAudit},
      {label:'Run next lead', icon:'i-play', primary:true, on:()=>S.leads.length&&runLead(S.leads[0].file, true)}]);
 
@@ -1087,6 +1088,25 @@ function vAudit(v){
   const host = el('div'); v.appendChild(host);
   renderTable(host, 'auditbook', auditCols(), S.audit.records, {unit:'records', sortKey:'ts', sortDir:'desc'});
 }
+/* Latest real outcome per lead, reconstructed from the audit log. */
+function leadOutcome(leadId){
+  const recs = S.audit.records.filter(r=>r.lead_id===leadId);  // newest first
+  const out = {status:null, rep:null, territory:null, priority:null, score:null, ts:null};
+  for(const r of recs){
+    const d = r.decision||{};
+    if(!out.status){
+      if(r.stage==='assignment_applied') out.status='applied';
+      else if(r.stage==='rejected') out.status='rejected';
+      else if(r.stage==='routed_to_review') out.status='review';
+      else if(r.stage==='pending_approval') out.status='pending';
+    }
+    if(!out.rep && d.rep){ out.rep=d.rep; out.territory=d.territory; out.priority=d.priority; }
+    if(out.score==null && d.propensity_score!=null) out.score=d.propensity_score;
+    if(!out.ts) out.ts=r.ts;
+  }
+  return out;
+}
+const OUT_PAIR = {applied:PAIR.ok, rejected:PAIR.bad, pending:PAIR.warn, review:PAIR.cool};
 function vQueue(v){
   topbar('Routing Queue', `${S.leads.length} inbound leads awaiting a routing decision`, []);
   v.innerHTML='';
@@ -1100,8 +1120,26 @@ function vQueue(v){
     {key:'state', label:'State', type:'enum', w:'82px',
      render:r=>r.state?chip(r.state,PAIR.mute):'<span style="color:var(--ink-3)">—</span>'},
     {key:'notes', label:'Inbound note', type:'text',
-     render:r=>`<span style="color:var(--ink-2)">${esc(r.notes)}</span>`},
-    {key:'go', label:'', type:'text', w:'96px',
+     render:r=>`<span style="color:var(--ink-2)" title="${esc(r.notes)}">${esc(r.notes)}</span>`},
+    {key:'status', label:'Last outcome', type:'enum', w:'126px',
+     sort:r=>leadOutcome(r.lead_id).status||'~',
+     render:r=>{ const o=leadOutcome(r.lead_id);
+       return o.status?chip(o.status.toUpperCase(), OUT_PAIR[o.status]):'<span style="color:var(--ink-3)">never run</span>'; },
+     foot:rows=>`<b>${rows.filter(r=>leadOutcome(r.lead_id).status).length}</b> run`},
+    {key:'owner', label:'Routed to', type:'person', w:'150px',
+     sort:r=>leadOutcome(r.lead_id).rep,
+     render:r=>{ const o=leadOutcome(r.lead_id);
+       return o.rep?`<span class="cell-id">${sq(o.rep)}<span class="nm">${esc(o.rep)}</span></span>`
+                   :'<span style="color:var(--ink-3)">—</span>'; }},
+    {key:'prio', label:'Priority', type:'enum', w:'92px',
+     sort:r=>leadOutcome(r.lead_id).score,
+     render:r=>{ const o=leadOutcome(r.lead_id);
+       return o.priority?chip(o.priority, o.priority==='P1'?PAIR.hot:PAIR.cool):'<span style="color:var(--ink-3)">—</span>'; }},
+    {key:'score', label:'Propensity', type:'num', align:'r', w:'104px',
+     sort:r=>leadOutcome(r.lead_id).score,
+     render:r=>{ const o=leadOutcome(r.lead_id);
+       return o.score!=null?`<b style="font-weight:600">${o.score.toFixed(4)}</b>`:'<span style="color:var(--ink-3)">—</span>'; }},
+    {key:'go', label:'Action', type:'text', w:'96px',
      render:()=>`<span style="color:var(--brand);font-weight:600;display:inline-flex;align-items:center;gap:5px">${ico('i-play')}Run</span>`,
      sort:()=>0},
   ];
@@ -1110,6 +1148,31 @@ function vQueue(v){
   v.appendChild(h);
   const host = el('div'); v.appendChild(host);
   renderTable(host,'queue',cols,S.leads,{unit:'leads', sortKey:'lead_id', onRow:r=>runLead(r.file,true)});
+
+  /* Where the NEXT lead lands is a real, inspectable fact: the rotation
+     cursor on disk plus each rep's availability. */
+  const rot = S.desk.rotation||{};
+  const wrap = el('div'); wrap.style.padding='18px';
+  wrap.innerHTML = `<div class="sec-h"><h3>Where the next lead routes</h3><div class="sp"></div>
+    <span class="hint">round-robin cursors from runs/routing_state.json · unavailable reps are skipped and audited</span></div>`;
+  const g = el('div','hl');
+  g.style.gridTemplateColumns = `repeat(${Object.keys(S.terr.territories).length},1fr)`;
+  Object.entries(S.terr.territories).forEach(([terr, reps])=>{
+    const cursor = rot[terr];
+    const idx = cursor!=null ? cursor % reps.length : 0;
+    let next = null;
+    for(let i=0;i<reps.length;i++){ const c=reps[(idx+i)%reps.length]; if(c.available){ next=c; break; } }
+    const skipped = reps.filter(r=>!r.available);
+    const c = el('div','hlc');
+    c.innerHTML = `<div class="hlc-t"><span>${esc(terr)}</span>${chip(cursor!=null?'CURSOR '+cursor:'UNROTATED', cursor!=null?PAIR.brand:PAIR.mute)}</div>
+      <div class="hlc-v" style="font-size:16px">${next?sq(next.name):''}
+        <span style="font-size:14px;font-weight:600">${esc(next?next.name:'no rep available')}</span></div>
+      <div class="hlc-s">${skipped.length?`skips ${esc(skipped.map(r=>r.name).join(', '))} · unavailable`
+        :`${reps.length} reps, all available`}</div>`;
+    g.appendChild(c);
+  });
+  wrap.appendChild(g);
+  v.appendChild(wrap);
 }
 function vInsights(v){
   const reps = Object.values(repRoster());
@@ -1237,8 +1300,8 @@ function vTerritories(v){
   ].forEach(([k,bodyTxt,s])=>{
     const c = el('div','hlc');
     c.innerHTML = `<div class="hlc-t"><span>${esc(k)}</span></div>
-      <div style="font-size:11px;line-height:1.65;color:var(--ink-2);margin-top:6px;height:120px;
-        overflow:auto;font-family:var(--mono);white-space:pre-wrap">${esc(bodyTxt)}</div>
+      <div style="font-size:11px;line-height:1.7;color:var(--ink-2);margin-top:7px;max-height:168px;
+        overflow:auto;font-family:var(--mono);white-space:pre-wrap;padding-bottom:2px">${esc(bodyTxt)}</div>
       <div class="hlc-s" style="margin-top:7px">${esc(s)}</div>`;
     g.appendChild(c);
   });
