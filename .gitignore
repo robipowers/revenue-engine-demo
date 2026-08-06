@@ -6,3 +6,4 @@ shots-ui/
 __pycache__/
 *.pyc
 .venv/
+STUDY-GUIDE.html
