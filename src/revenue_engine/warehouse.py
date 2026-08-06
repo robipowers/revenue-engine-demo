@@ -76,26 +76,50 @@ COMPANIES: list[tuple[str, str, str, str, str | None]] = [
     ("Windrose Systems", "windrosesystems.com", "SaaS", "India", None),
 ]
 
+# Deliberately wide pools. A small pool crossed with a small pool is the
+# classic generated-data tell: with 30x30 and 120 draws, every first name and
+# every surname shows up ~4 times and a scanner spots it instantly.
 FIRST_NAMES = [
-    "Ava", "Liam", "Noah", "Emma", "Olivia", "Ethan", "Sofia", "Mason",
-    "Isabella", "Lucas", "Mia", "Daniel", "Amelia", "Henry", "Chloe",
-    "Marcus", "Nina", "Victor", "Elena", "Owen", "Priya", "Diego",
-    "Hannah", "Felix", "Grace", "Rafael", "Ines", "Theo", "Maren", "Kai",
+    "Adaeze", "Alejandro", "Amara", "Amelia", "Anders", "Anika", "Arjun", "Ava",
+    "Beatriz", "Bianca", "Callum", "Camille", "Cassian", "Chloe", "Clara", "Daniel",
+    "Daniela", "Declan", "Diego", "Dmitri", "Elena", "Elias", "Emma", "Esme",
+    "Ethan", "Fatima", "Felix", "Freya", "Gabriel", "Giulia", "Grace", "Hana",
+    "Hannah", "Henry", "Hendrik", "Imani", "Ines", "Ingrid", "Isabel", "Isabella",
+    "Jonas", "Junko", "Kai", "Kaveh", "Keiko", "Lars", "Leila", "Liam",
+    "Lucas", "Lucia", "Maren", "Malik", "Marcus", "Marta", "Mason", "Mateo",
+    "Mia", "Miriam", "Nadia", "Niamh", "Nina", "Noah", "Noor", "Olamide",
+    "Olivia", "Oscar", "Owen", "Paloma", "Priya", "Priyanka", "Rafael", "Rafaela",
+    "Rohan", "Rosa", "Sana", "Sebastian", "Sigrid", "Sofia", "Soren", "Tariq",
+    "Thandeka", "Theo", "Tobias", "Valentina", "Victor", "Viktor", "Wren",
+    "Yasmin", "Yuki", "Zara",
 ]
 
 LAST_NAMES = [
-    "Calloway", "Trent", "Vasquez", "Okonkwo", "Marsh", "Ellery", "Novak",
-    "Whitfield", "Iyer", "Donnelly", "Ashcroft", "Beaumont", "Castellanos",
-    "Drummond", "Eastman", "Fairbanks", "Grantham", "Holloway", "Ibarra",
-    "Jansen", "Kessler", "Lindholm", "Moreau", "Nakamura", "Ostrander",
-    "Pemberton", "Quintero", "Rowley", "Sandoval", "Thackeray",
+    "Adeyemi", "Ashcroft", "Ashworth", "Beaumont", "Bergqvist", "Bhatt", "Calderon",
+    "Calloway", "Castellanos", "Chandra", "Delacroix", "Donnelly", "Drummond",
+    "Eastman", "Ellery", "Eriksen", "Fairbanks", "Fontaine", "Gallagher", "Ghosh",
+    "Grantham", "Halvorsen", "Hartmann", "Holloway", "Ibarra", "Ishikawa", "Iyer",
+    "Jansen", "Kaur", "Kessler", "Kowalski", "Lindgren", "Lindholm", "Loughlin",
+    "Maleki", "Marchetti", "Marsh", "Mbeki", "Moreau", "Nakamura", "Nakashima",
+    "Novak", "Okonkwo", "Ostrander", "Oyelaran", "Pemberton", "Pereira", "Petrov",
+    "Quintero", "Rasmussen", "Ravelo", "Rowley", "Salinas", "Sandoval", "Sorensen",
+    "Suzuki", "Tanaka", "Thackeray", "Thorne", "Trent", "Vasquez", "Villanueva",
+    "Walsh", "Weatherby", "Whitfield", "Yamamoto", "Zielinski",
 ]
 
 TITLES = [
-    "VP of Revenue Operations", "Director of Marketing", "Head of Sales",
-    "Chief Revenue Officer", "Marketing Operations Manager",
-    "Sales Operations Lead", "Director of Demand Generation",
-    "VP of Growth", "Revenue Systems Manager", "Head of Business Development",
+    "VP of Revenue Operations", "Director of Revenue Operations", "Head of RevOps",
+    "Revenue Systems Manager", "Sales Operations Lead", "Sales Operations Manager",
+    "Director of Sales Operations", "Marketing Operations Manager",
+    "Marketing Operations Lead", "Director of Demand Generation",
+    "Head of Demand Generation", "Director of Growth Marketing", "VP of Growth",
+    "VP of Marketing", "Lifecycle Marketing Manager", "Chief Revenue Officer",
+    "VP of Sales", "Regional Sales Director", "Head of Sales",
+    "Head of Business Development", "Director of Partnerships",
+    "GTM Systems Lead", "Salesforce Administrator", "CRM Platform Owner",
+    "Director of Sales Enablement", "Sales Enablement Manager",
+    "Director of Customer Success", "Customer Success Manager",
+    "Growth Operations Manager", "Business Systems Analyst",
 ]
 
 ACTIVITY_TYPES = [
@@ -104,6 +128,10 @@ ACTIVITY_TYPES = [
 ]
 
 BASE_DATE = datetime(2026, 1, 15)
+
+# The account data/inbound/lead_001.json matches on domain. The demo must show
+# a P1 and a P2 side by side, so this one is given live recent engagement.
+HOT_BEAT_ACCOUNT = "Meterhouse"
 
 DDL = """
 CREATE TABLE accounts (
@@ -162,9 +190,33 @@ def _generate(rng: random.Random):
             }
         )
 
-    # 3 contacts per account -> 120 contacts, unique names via pool pairing.
+    # 3 contacts per account -> 120 contacts. Pairs are chosen so no first
+    # name and no surname is reused more than twice across the whole book;
+    # a plain shuffled cartesian product repeats each part ~4 times, which is
+    # the thing that makes a contact list read as generated.
     name_pairs = [(f, l) for f in FIRST_NAMES for l in LAST_NAMES]
     rng.shuffle(name_pairs)
+    needed = len(COMPANIES) * 3
+    first_used: dict[str, int] = {}
+    last_used: dict[str, int] = {}
+    picked: list[tuple[str, str]] = []
+    taken: set[tuple[str, str]] = set()
+    for cap in (1, 2, 3):  # widen the cap only if the book cannot be filled
+        for pair in name_pairs:
+            if len(picked) >= needed:
+                break
+            if pair in taken:
+                continue
+            first, last = pair
+            if first_used.get(first, 0) < cap and last_used.get(last, 0) < cap:
+                picked.append(pair)
+                taken.add(pair)
+                first_used[first] = first_used.get(first, 0) + 1
+                last_used[last] = last_used.get(last, 0) + 1
+        if len(picked) >= needed:
+            break
+    assert len(picked) == needed and len(set(picked)) == needed
+    name_pairs = picked
     contacts = []
     contact_id = 0
     contacts_by_account: dict[int, list[int]] = {}
@@ -184,9 +236,15 @@ def _generate(rng: random.Random):
             )
             contacts_by_account[acct["id"]].append(contact_id)
 
-    # 80 opportunities: 30 won, 30 lost, 20 open, two per account.
+    # 80 opportunities: 30 won, 30 lost, 20 open. Spread 1-4 per account
+    # rather than exactly 2 -- a constant count makes prior_opportunity_count
+    # a dead model feature and every account's win history identical.
     outcomes = ["won"] * 30 + ["lost"] * 30 + ["open"] * 20
     rng.shuffle(outcomes)
+    per_account = [1] * 14 + [2] * 16 + [3] * 6 + [4] * 4   # sums to 80
+    rng.shuffle(per_account)
+    slots = [(acct, slot) for acct, n in zip(accounts, per_account)
+             for slot in range(n)]
     opportunities = []
     activities = []
     activity_id = 0
@@ -205,12 +263,16 @@ def _generate(rng: random.Random):
         )
 
     opp_id = 0
-    for slot in range(2):
-        for acct in accounts:
+    if True:
+        for acct, slot in slots:
             opp_id += 1
             outcome = outcomes[opp_id - 1]
+            # Space an account's opportunities far enough apart that their
+            # 30-day feature windows do not overlap. Stacking them blurs each
+            # opportunity's own pre-creation signal into its neighbours and
+            # collapses the model's AUC.
             created_at = BASE_DATE + timedelta(
-                days=rng.randint(20 + slot * 60, 75 + slot * 60),
+                days=rng.randint(20 + slot * 36, 56 + slot * 36),
                 hours=rng.randint(8, 18),
                 minutes=rng.randint(0, 59),
             )
@@ -222,7 +284,16 @@ def _generate(rng: random.Random):
                 stage = "Closed Won" if outcome == "won" else "Closed Lost"
                 closed_at = created_at + timedelta(days=rng.randint(21, 65))
                 outcome_val = outcome
-            amount = round(rng.uniform(18_000, 240_000) / 500) * 500
+            # Priced the way a quote actually is: seats x an annual per-seat
+            # rate, with an occasional negotiated discount. A uniform band of
+            # round $500 multiples is the loudest "generated data" tell there
+            # is, and it makes the Amount column useless for sorting.
+            seats = max(5, int(rng.lognormvariate(3.5, 0.85)))
+            per_seat = rng.choice([540, 660, 780, 900, 1_080, 1_200, 1_450])
+            amount = seats * per_seat
+            if rng.random() < 0.35:                      # negotiated down
+                amount = int(amount * rng.uniform(0.82, 0.95))
+            amount = min(max(amount, 6_000), 940_000)
             opportunities.append(
                 {
                     "id": opp_id,
@@ -261,6 +332,22 @@ def _generate(rng: random.Random):
         acct = rng.choice(accounts)
         ts = BASE_DATE + timedelta(days=rng.uniform(-10, 170), hours=rng.uniform(0, 23))
         add_activity(acct["id"], rng.choice(contacts_by_account[acct["id"]]), ts)
+
+    # Narrative shaping, stated plainly: the demo has to show BOTH SLA tiers,
+    # so the account the hot beat matches carries a live surge of engagement in
+    # the days before the scoring clock, and the account the messy beat resolves
+    # to stays quiet. These accounts are scored by the same model on the same
+    # features as every other account -- only their activity history is arranged,
+    # exactly as the rest of this fixture is.
+    clock = max(o["created_at"] for o in opportunities) + timedelta(hours=1)
+    by_name = {a["name"]: a for a in accounts}
+    hot = by_name.get(HOT_BEAT_ACCOUNT)
+    if hot is not None:
+        roster = contacts_by_account[hot["id"]]
+        engaged = roster[:2] if len(roster) >= 2 else roster
+        for i in range(14):
+            ts = clock - timedelta(days=rng.uniform(0.5, 26.0), hours=rng.uniform(0, 20))
+            add_activity(hot["id"], engaged[i % len(engaged)], ts)
 
     return accounts, contacts, activities, opportunities
 

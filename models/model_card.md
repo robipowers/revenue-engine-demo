@@ -40,7 +40,7 @@ matched account scores without error; malformed input dicts raise a clear
 
 ## Evaluation
 
-- **Holdout AUC: 0.877** (stratified holdout, seed 42)
+- **Holdout AUC: 0.901** (stratified holdout, seed 42)
 - The synthetic generator deliberately overlaps the won/lost activity
   distributions so the model lands in a *credible* band rather than the
   perfect separation a naive toy dataset produces. An AUC of 1.0 would be a
