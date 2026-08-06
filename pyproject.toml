@@ -11,6 +11,9 @@ dependencies = [
     "mcp==2.0.0",
 ]
 
+[project.optional-dependencies]
+llm = ["anthropic"]
+
 [dependency-groups]
 dev = ["pytest>=8.0"]
 

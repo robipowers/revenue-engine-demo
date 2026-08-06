@@ -1,6 +1,8 @@
 """Tests for the propensity model: determinism, calibrated AUC, leakage guard,
-defaults, purity, input validation, and model-card honesty."""
+defaults, purity, input validation, model-card honesty, and shipped-artifact
+drift guards."""
 
+import hashlib
 from datetime import timedelta
 from pathlib import Path
 
@@ -9,7 +11,7 @@ import numpy as np
 import pytest
 
 from revenue_engine import features, model, warehouse
-from revenue_engine.config import ROOT
+from revenue_engine.config import RANDOM_SEED, ROOT
 
 
 @pytest.fixture(scope="module")
@@ -133,3 +135,39 @@ def test_model_card_lists_every_feature():
 def test_shipped_artifacts_exist():
     assert (ROOT / "models" / "propensity.joblib").exists()
     assert (ROOT / "data" / "seed" / "warehouse.duckdb").exists()
+
+
+def _table_hash(con, table: str) -> str:
+    rows = con.execute(f"SELECT * FROM {table} ORDER BY id").fetchall()
+    return hashlib.sha256(repr(rows).encode()).hexdigest()
+
+
+def test_shipped_warehouse_matches_fresh_rebuild(tmp_path):
+    """Drift guard: the committed seed DB must equal what the generator
+    produces today, table by table."""
+    fresh = tmp_path / "fresh.duckdb"
+    warehouse.rebuild(fresh)
+    con_fresh = duckdb.connect(str(fresh), read_only=True)
+    con_shipped = duckdb.connect(
+        str(ROOT / "data" / "seed" / "warehouse.duckdb"), read_only=True
+    )
+    try:
+        for table in ("accounts", "contacts", "activities", "opportunities"):
+            assert _table_hash(con_fresh, table) == _table_hash(con_shipped, table), (
+                f"shipped seed DB table {table} drifted from the generator; "
+                "regenerate with: uv run python -m revenue_engine.warehouse --rebuild"
+            )
+    finally:
+        con_fresh.close()
+        con_shipped.close()
+
+
+def test_shipped_model_payload_matches_code():
+    """Drift guard: the committed model must carry the current feature set
+    and the canonical seed."""
+    payload = model.load(model.MODEL_PATH)
+    assert payload["feature_names"] == list(features.FEATURE_NAMES), (
+        "shipped model feature_names drifted from features.FEATURE_NAMES; "
+        "retrain with: uv run python -m revenue_engine.model --train"
+    )
+    assert payload["random_seed"] == RANDOM_SEED

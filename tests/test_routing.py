@@ -169,3 +169,62 @@ def test_reset_state_clears_rotation_but_never_audit(tmp_path):
         runs_dir=tmp_path, territories=TEST_TERRITORIES, territory="TEST",
     )
     assert again.rep == first.rep, "rotation restarts from the beginning after reset"
+
+
+# ---------------------------------------------------------------------------
+# Rotation-state robustness: corrupt/invalid state degrades, never crashes
+# ---------------------------------------------------------------------------
+
+def _write_state(runs_dir, content: str):
+    path = runs_dir / "routing_state.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+
+
+def test_corrupt_state_file_degrades_and_audits(tmp_path):
+    _write_state(tmp_path, "not json{")
+    decision = routing.route_lead(
+        lead_id="lead-corrupt", country="United States", state="CA",
+        propensity_score=0.5, runs_dir=tmp_path,
+        territories=TEST_TERRITORIES, territory="TEST",
+    )
+    assert decision.rep == "Rep A", "corrupt state must reset rotation to the start"
+    resets = [l for l in _audit_lines(tmp_path) if l["stage"] == "routing_state_reset"]
+    assert resets, "discarding corrupt rotation state must be audited"
+    assert resets[-1]["rule_fired"] == "corrupt_state_discarded"
+
+
+def test_negative_index_state_discarded(tmp_path):
+    _write_state(tmp_path, json.dumps({"TEST": -1}))
+    decision = routing.route_lead(
+        lead_id="lead-neg", country="United States", state="CA",
+        propensity_score=0.5, runs_dir=tmp_path,
+        territories=TEST_TERRITORIES, territory="TEST",
+    )
+    assert decision.rep == "Rep A"
+    stages = [l["stage"] for l in _audit_lines(tmp_path)]
+    assert "routing_state_reset" in stages
+
+
+def test_non_int_state_value_discarded(tmp_path):
+    _write_state(tmp_path, json.dumps({"TEST": "evil"}))
+    decision = routing.route_lead(
+        lead_id="lead-str", country="United States", state="CA",
+        propensity_score=0.5, runs_dir=tmp_path,
+        territories=TEST_TERRITORIES, territory="TEST",
+    )
+    assert decision.rep == "Rep A"
+    stages = [l["stage"] for l in _audit_lines(tmp_path)]
+    assert "routing_state_reset" in stages
+
+
+def test_state_save_is_atomic_no_temp_left_behind(tmp_path):
+    routing.route_lead(
+        lead_id="lead-atomic", country="United States", state="CA",
+        propensity_score=0.5, runs_dir=tmp_path,
+        territories=TEST_TERRITORIES, territory="TEST",
+    )
+    assert (tmp_path / "routing_state.json").exists()
+    assert not list(tmp_path.glob("*.tmp")), "atomic save must not leave temp files"
+    state = json.loads((tmp_path / "routing_state.json").read_text())
+    assert all(isinstance(v, int) and v >= 0 for v in state.values())

@@ -8,6 +8,7 @@ skip is audited. reset_state clears the rotation only — never the audit log.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -36,17 +37,50 @@ def _state_path(runs_dir: Path | str | None = None) -> Path:
     return base / STATE_FILENAME
 
 
+def _valid_state(raw) -> bool:
+    """Rotation state must be a dict of {territory: non-negative int}."""
+    if not isinstance(raw, dict):
+        return False
+    return all(
+        isinstance(k, str) and isinstance(v, int) and not isinstance(v, bool) and v >= 0
+        for k, v in raw.items()
+    )
+
+
 def _load_state(runs_dir) -> dict:
+    """Load rotation state; a corrupt or invalid file degrades to empty state.
+
+    Rotation is best-effort by design: a truncated write or a hand-edited
+    file must never kill a run. The discard is audited, never silent.
+    """
     path = _state_path(runs_dir)
-    if path.exists():
-        return json.loads(path.read_text())
-    return {}
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        raw = None
+    if not _valid_state(raw):
+        audit.append(
+            stage="routing_state_reset",
+            lead_id="system",
+            inputs={"path": str(path)},
+            decision={"reason": "corrupt_state_discarded"},
+            rule_fired="corrupt_state_discarded",
+            runs_dir=runs_dir,
+        )
+        return {}
+    return raw
 
 
 def _save_state(state: dict, runs_dir) -> None:
+    """Atomic write: temp file + os.replace, so a killed process can never
+    leave a truncated routing_state.json behind."""
     path = _state_path(runs_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2))
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(state, indent=2))
+    os.replace(tmp, path)
 
 
 def reset_state(runs_dir: Path | str | None = None) -> None:
@@ -85,7 +119,7 @@ def route_lead(
         raise ValueError(f"territory {territory!r} has no rep roster")
 
     rotation = _load_state(runs_dir)
-    idx = rotation.get(territory, 0) % len(roster)
+    idx = max(0, int(rotation.get(territory, 0))) % len(roster)
 
     skipped: list[str] = []
     assigned = None

@@ -24,7 +24,15 @@ Run the pipeline on any inbound lead:
 uv run python -m revenue_engine.demo data/inbound/lead_001.json
 ```
 
-Flags: `--approve` applies the proposed assignment, `--reject` sends it to human review, `--fresh` resets round-robin rotation state (never the audit log), `--llm` enables the two LLM judgment steps (needs `ANTHROPIC_API_KEY`; without it every step uses its deterministic fallback and nothing touches the network).
+Flags: `--approve` applies the proposed assignment, `--reject` sends it to human review, `--fresh` resets round-robin rotation state (never the audit log), `--llm` enables the two LLM judgment steps. The LLM path needs both `ANTHROPIC_API_KEY` and the `anthropic` package, installed via the optional extra:
+
+```
+uv run --extra llm python -m revenue_engine.demo data/inbound/lead_001.json --llm
+```
+
+Without the key or the package every step uses its deterministic fallback and nothing touches the network. A missing package is reported distinctly (`llm_unavailable: anthropic not installed (install extra: llm)`) on stderr and in the audit trail, so it is never mistaken for an API failure.
+
+A pending run persists its proposal to `runs/pending/<lead_id>.json`. A later `--approve` or `--reject` consumes that stored proposal exactly as it was shown, without re-running the pipeline or advancing the round-robin rotation a second time.
 
 ## The 5-minute demo script
 
@@ -50,7 +58,7 @@ Flags: `--approve` applies the proposed assignment, `--reject` sends it to human
    uv run python -m revenue_engine.demo data/inbound/lead_002.json --approve
    ```
 
-   Say: "Nothing was assigned yet. The pipeline always stops at `pending_approval`, and only an explicit `--approve` writes `assignment_applied`. Note the rep rotated to Chris Okafor: the round-robin advanced because this is a second routed lead into that territory. That is the rotation state working, and `--fresh` resets it without ever touching the audit log."
+   Say: "Nothing was assigned yet. The pipeline always stops at `pending_approval`, persists the proposal to `runs/pending/`, and only an explicit `--approve` writes `assignment_applied`. The approve run consumes the stored proposal: the exact rep you just saw is the rep applied, the pipeline does not re-run, and the round-robin rotation does not advance a second time. `--fresh` resets rotation state without ever touching the audit log."
 
 4. **Governance.** Run:
 
@@ -67,6 +75,8 @@ Flags: `--approve` applies the proposed assignment, `--reject` sends it to human
    ```
 
    Say: "Same ranked candidates as the pipeline's matcher, because it is the same scoring code. `account_context` adds the current propensity score, `territory_rules` exposes rosters and SLA tiers." For a live inspector, `uv run mcp dev src/revenue_engine/mcp_server.py` works but needs `mcp[cli]`, npx, and network, so treat it as an optional manual smoke only.
+
+   Paths anchor to the repo root derived from the installed package location, so the MCP server (and the demo CLI) can be launched from any working directory. Set `REVENUE_ENGINE_ROOT` to point at a different root when the data and model artifacts live elsewhere, for example in an MCP client config that runs the server outside the checkout.
 
 If asked about the no-match path: `lead_003.json` (an unknown company) exits with a structured `create_account` proposal instead of guessing.
 

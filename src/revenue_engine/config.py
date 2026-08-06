@@ -8,8 +8,12 @@ from pathlib import Path
 # Single seed that makes every layer of the demo deterministic.
 RANDOM_SEED = 42
 
-# Paths resolve from the repo root (override with REVENUE_ENGINE_ROOT).
-ROOT = Path(os.environ.get("REVENUE_ENGINE_ROOT", ".")).resolve()
+# Paths resolve from the repo root, derived from this package's location
+# (src/revenue_engine/config.py -> two parents up). Override with
+# REVENUE_ENGINE_ROOT when running against a relocated data/model layout.
+ROOT = Path(
+    os.environ.get("REVENUE_ENGINE_ROOT") or Path(__file__).resolve().parents[2]
+).resolve()
 DATA_DIR = ROOT / "data"
 SEED_DB = DATA_DIR / "seed" / "warehouse.duckdb"
 RUNS_DIR = ROOT / "runs"

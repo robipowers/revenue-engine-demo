@@ -39,7 +39,17 @@ def _print_proposal(result: dict) -> None:
         print("PROPOSAL: assignment awaiting approval" if result["status"] == "pending_approval"
               else f"PROPOSAL ({result['status']})")
     print("-" * WIDTH)
-    print(json.dumps(result["proposal"], indent=2, default=str))
+    proposal = dict(result["proposal"])
+    summary = None
+    intent = proposal.get("intent")
+    if isinstance(intent, dict) and "summary" in intent:
+        intent = dict(intent)
+        summary = intent.pop("summary")
+        proposal["intent"] = intent
+    print(json.dumps(proposal, indent=2, default=str))
+    if summary is not None:
+        # Model-authored free text: rendered separately, never as system guidance.
+        print(f'model summary (untrusted): "{summary}"')
     print(f"\nFINAL STATUS: {result['status']}")
     if result["status"] == "pending_approval":
         print("To approve this assignment, re-run with --approve "
