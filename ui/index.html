@@ -940,7 +940,7 @@ function auditCols(compact){
     {key:'lead_id', label:'Lead', type:'mono', w:compact?'72px':'86px',
      render:r=>r.lead_id?`<span class="mono">${esc(r.lead_id)}</span>`:'<span style="color:var(--ink-3)">—</span>',
      foot:footUniq('lead_id')},
-    {key:'rule_fired', label:'Rule fired', type:'text', w:compact?'190px':'204px',
+    {key:'rule_fired', label:'Rule fired', type:'text', w:compact?'190px':'222px',
      render:r=>`<span class="mono" style="color:var(--ink)">${esc(r.rule_fired||'—')}</span>`,
      foot:rows=>`<b>${new Set(rows.map(r=>r.rule_fired)).size}</b> rules`},
     {key:'fallback_used', label:'Fallback', type:'enum', w:compact?'88px':'104px',
@@ -1099,12 +1099,17 @@ function vAudit(v){
     c.innerHTML = `<div class="k">${esc(kk)}</div><div class="v">${esc(String(vv))}</div><div class="s" title="${esc(ss)}">${esc(ss)}</div>`;
     kv.appendChild(c);
   });
+  k.style.flex='none';
   k.appendChild(kv); v.appendChild(k);
-  const h = el('div','phead'); h.style.marginTop='14px';
-  h.innerHTML = `<h2>Decision records</h2><div class="sp"></div><span class="pmeta">newest first</span>`;
-  v.appendChild(h);
-  const host = el('div'); v.appendChild(host);
-  renderTable(host, 'auditbook', auditCols(), S.audit.records, {unit:'records', sortKey:'ts', sortDir:'desc'});
+  /* Same sticky-header contract as the object books: the table owns the
+     scroll, the summary cards above it do not move. */
+  v.classList.add('view-table');
+  const host = el('div');
+  host.style.cssText='flex:1;display:flex;flex-direction:column;min-height:0;margin-top:14px';
+  v.appendChild(host);
+  renderTable(host, 'auditbook', auditCols(), S.audit.records,
+    {unit:'records', sortKey:'ts', sortDir:'desc',
+     hint:'append-only · newest first'});
 }
 /* Latest real outcome per lead, reconstructed from the audit log. */
 function leadOutcome(leadId){
