@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relay — LeanData GTM Engineer (Data &amp; AI) study guide</title>
+<style>
+:root{
+  --bg:#fff; --sunk:#F7F7F8; --line:#E6E6EA; --soft:#F0F0F3;
+  --ink:#16161A; --ink2:#54545F; --ink3:#8A8A95;
+  --brand:#4F46E5; --brand-t:#EEF0FF; --brand-ink:#3730A3;
+  --ok:#047857; --ok-t:#E7F6EF; --warn:#B45309; --warn-t:#FEF6E7;
+  --bad:#BE123C; --bad-t:#FEECEF; --hot:#C2410C; --hot-t:#FFF0E8;
+  --sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);color:var(--ink);background:var(--bg);line-height:1.65;font-size:16px;-webkit-font-smoothing:antialiased}
+.wrap{display:grid;grid-template-columns:264px minmax(0,1fr);max-width:1360px;margin:0 auto;gap:0}
+/* ---- nav ---- */
+nav{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:26px 18px 40px;border-right:1px solid var(--line);background:var(--sunk)}
+nav .brand{font-weight:750;font-size:17px;letter-spacing:-.02em;margin-bottom:2px}
+nav .sub{font-size:12px;color:var(--ink3);margin-bottom:18px;line-height:1.4}
+nav a{display:block;color:var(--ink2);text-decoration:none;font-size:13.5px;padding:5px 9px;border-radius:6px;margin-bottom:1px}
+nav a:hover{background:#EDEDF1;color:var(--ink)}
+nav a.h{font-weight:650;color:var(--ink);margin-top:14px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;padding-left:9px;pointer-events:none}
+main{padding:44px 52px 120px;min-width:0}
+/* ---- type ---- */
+h1{font-size:36px;line-height:1.15;letter-spacing:-.03em;font-weight:750;margin-bottom:12px}
+h2{font-size:25px;letter-spacing:-.022em;font-weight:700;margin:52px 0 14px;padding-top:20px;border-top:1px solid var(--line)}
+h2:first-of-type{border-top:none;padding-top:0}
+h3{font-size:18px;letter-spacing:-.012em;font-weight:650;margin:28px 0 9px}
+h4{font-size:15px;font-weight:650;margin:20px 0 6px;color:var(--ink)}
+p{margin-bottom:13px;max-width:74ch}
+ul,ol{margin:0 0 14px 22px;max-width:74ch}
+li{margin-bottom:6px}
+strong{font-weight:650}
+code{font-family:var(--mono);font-size:13.5px;background:var(--soft);padding:1.5px 5px;border-radius:4px;color:var(--brand-ink)}
+pre{background:#16161A;color:#E8E8ED;padding:15px 17px;border-radius:9px;overflow-x:auto;margin:0 0 16px;font-size:13px;line-height:1.6}
+pre code{background:none;color:inherit;padding:0;font-size:13px}
+a{color:var(--brand-ink)}
+.lede{font-size:18.5px;color:var(--ink2);max-width:70ch;margin-bottom:8px}
+/* ---- blocks ---- */
+.card{border:1px solid var(--line);border-radius:11px;padding:17px 20px;margin:0 0 18px;background:var(--bg)}
+.card.key{background:var(--brand-t);border-color:#CDD2F8}
+.card.warn{background:var(--warn-t);border-color:#F0DFC0}
+.card.ok{background:var(--ok-t);border-color:#CDE9DC}
+.card.bad{background:var(--bad-t);border-color:#F5D3DA}
+.card h4{margin-top:0}
+.card p:last-child,.card ul:last-child{margin-bottom:0}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.06em;padding:2.5px 8px;border-radius:5px;vertical-align:middle}
+.t-brand{background:var(--brand-t);color:var(--brand-ink)}
+.t-ok{background:var(--ok-t);color:var(--ok)}
+.t-warn{background:var(--warn-t);color:var(--warn)}
+.t-bad{background:var(--bad-t);color:var(--bad)}
+.t-hot{background:var(--hot-t);color:var(--hot)}
+table{border-collapse:collapse;width:100%;margin:0 0 20px;font-size:14.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--sunk);font-weight:650;font-size:12.5px;letter-spacing:.02em;color:var(--ink2)}
+tbody tr:hover{background:#FAFAFC}
+td code{font-size:12.5px}
+.say{border-left:3px solid var(--brand);background:var(--sunk);padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 16px;max-width:74ch}
+.say b{color:var(--brand-ink)}
+details{border:1px solid var(--line);border-radius:9px;padding:12px 16px;margin-bottom:10px;background:var(--bg)}
+details[open]{background:var(--sunk)}
+summary{cursor:pointer;font-weight:600;font-size:15px}
+summary::marker{color:var(--brand)}
+details .a{margin-top:11px;padding-top:11px;border-top:1px solid var(--line);color:var(--ink2)}
+details .a p:last-child{margin-bottom:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+.flow{font-family:var(--mono);font-size:13px;line-height:1.85;background:var(--sunk);border:1px solid var(--line);border-radius:9px;padding:16px 18px;overflow-x:auto;margin-bottom:18px}
+.num{counter-reset:s}
+.num > li{margin-bottom:14px}
+@media (max-width:960px){
+  .wrap{grid-template-columns:1fr}
+  nav{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line)}
+  main{padding:28px 22px 80px}
+  .grid2{grid-template-columns:1fr}
+}
+@media print{nav{display:none} .wrap{grid-template-columns:1fr} main{padding:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <div class="brand">Relay study guide</div>
+  <div class="sub">LeanData · GTM Engineer (Data &amp; AI)<br>Interview: Mon 10 Aug, 2:00 PM</div>
+  <a class="h">Part 1 — the job</a>
+  <a href="#role">The role, decoded</a>
+  <a href="#four">The four responsibilities</a>
+  <a href="#reqs">The five requirements</a>
+  <a class="h">Part 2 — what you built</a>
+  <a href="#what">What Relay is</a>
+  <a href="#why">Why this, not a slide deck</a>
+  <a href="#arch">Architecture in one picture</a>
+  <a href="#stages">The seven stages</a>
+  <a class="h">Part 3 — the parts</a>
+  <a href="#modules">Every module explained</a>
+  <a href="#model">The model, in depth</a>
+  <a href="#gov">The governance layer</a>
+  <a href="#mcp">The MCP context layer</a>
+  <a href="#console">The console screens</a>
+  <a class="h">Part 4 — the interview</a>
+  <a href="#map">JD → demo mapping</a>
+  <a href="#vocab">Vocabulary you must own</a>
+  <a href="#qa">Questions &amp; answers</a>
+  <a href="#gaps">What you did NOT build</a>
+  <a href="#quiz">Quiz yourself</a>
+</nav>
+<main>
+
+<h1>The autonomous revenue engine</h1>
+<p class="lede">Everything you need to understand, defend, and talk fluently about the demo you built — and the job it was built for.</p>
+<p style="color:var(--ink3);font-size:14px">Read Part 1 and Part 4 if you have one hour. Read all of it if you have three. Every number in this guide was read out of the running system, not remembered.</p>
+
+<!-- ===================== PART 1 ===================== -->
+<h2 id="role">The role, decoded</h2>
+
+<p>Here is the sentence LeanData actually wrote:</p>
+
+<div class="card key">
+<p style="margin:0">“We are seeking a <b>GTM Engineer (Data &amp; AI)</b> to be the <b>lead architect of our autonomous revenue engine</b>. This is a critical role focused on building the <b>Data and Context layers</b> that serve as the ‘brain’ for our AI strategy. We aren't just looking for someone to manage tools, we want a <b>builder</b> who can accelerate our <b>agentic GTM automation</b>, where workflows don't just follow rules, but <b>reason through signals</b> to power the entire customer journey.”</p>
+</div>
+
+<h3>Translating that, phrase by phrase</h3>
+<table>
+<thead><tr><th style="width:32%">They wrote</th><th>It means</th></tr></thead>
+<tbody>
+<tr><td><b>GTM Engineer</b></td><td>Go-To-Market Engineer. GTM = everything that gets a product to customers: marketing, sales, customer experience. An <em>engineer</em> in that world writes code and builds systems, rather than configuring SaaS tools by clicking.</td></tr>
+<tr><td><b>autonomous revenue engine</b></td><td>A system that moves a lead from “arrived” to “assigned and worked” without a human doing the routing by hand.</td></tr>
+<tr><td><b>Data layer</b></td><td>One place where all the facts live, joined together. Not five disconnected tools.</td></tr>
+<tr><td><b>Context layer</b></td><td>The part that <em>serves</em> those facts to an AI at the moment it needs to decide something. A warehouse is storage; a context layer is delivery.</td></tr>
+<tr><td><b>agentic</b></td><td>An AI that takes actions in a sequence, not just answers a question. It decides, acts, and the result feeds the next step.</td></tr>
+<tr><td><b>reason through signals, not follow rules</b></td><td>The system handles inputs nobody wrote a rule for — a misspelled company name, a rambling note — instead of failing.</td></tr>
+<tr><td><b>not manage tools — a builder</b></td><td>This is the whole filter. They are screening out RevOps people whose skill is administering Salesforce, and screening <em>in</em> people who ship systems.</td></tr>
+</tbody>
+</table>
+
+<div class="card">
+<h4>The single most important thing to understand about this job</h4>
+<p>There is a war inside every RevOps team between <b>deterministic</b> and <b>probabilistic</b> logic.</p>
+<p><b>Deterministic</b> = a rule. “If country is Germany, route to EMEA.” Same input, same output, forever. Auditable, boring, reliable.</p>
+<p><b>Probabilistic</b> = a model or an LLM. “This lead <em>seems</em> like it wants pricing.” Handles mess a rule can't, but can be wrong and can't easily be explained.</p>
+<p style="margin-bottom:0">LeanData's JD asks for <b>“blending probabilistic AI reasoning with deterministic logic.”</b> That word <em>blending</em> is the job. Your demo is a working answer to exactly that sentence — and the answer is: <b>let AI judge, but never let it be the last word, and write down which one decided.</b></p>
+</div>
+
+<h2 id="four">The four responsibilities, and what each really asks</h2>
+
+<ol class="num">
+<li>
+<h4>1. “Architect the GTM Intelligence Foundation — a unified data layer that merges structured (DataLake/APIs/MCPs) and unstructured signals (Calls/Emails/Chats) for agentic reasoning.”</h4>
+<p><b>What they're asking:</b> can you build one queryable place that holds both the tidy stuff (rows in a database) and the messy stuff (what someone said in an email), and expose it so an AI can use it?</p>
+<p><b>What Relay does:</b> a DuckDB warehouse holds the structured side — accounts, contacts, activities, opportunities, joined by keys. The unstructured side is the free-text <code>notes</code> field on every inbound lead, which gets read and classified. An <b>MCP server</b> exposes the warehouse as three tools any AI agent can call. That is literally “DataLake / APIs / MCPs.”</p>
+</li>
+<li>
+<h4>2. “Engineer Agentic Workflows — autonomous systems in the execution path of the funnel, blending probabilistic AI reasoning with deterministic logic.”</h4>
+<p><b>What they're asking:</b> not a chatbot on the side. Something that sits <em>in the path</em> — if it breaks, leads stop moving.</p>
+<p><b>What Relay does:</b> a seven-stage pipeline where two stages are LLM judgment calls and five are deterministic. Every LLM stage has a deterministic fallback, and when the fallback fires it is recorded. Right now, with no API key set, <b>15.6% of all decisions in the log were fallbacks</b> — and the system still completed every run.</p>
+</li>
+<li>
+<h4>3. “Lead predictive modeling — own the logic and technical setup for scoring and propensity models, integrated into the agentic orchestration layer.”</h4>
+<p><b>What they're asking:</b> can you build a scoring model <em>and</em> wire it into the thing that acts on it? Many people can do one or the other.</p>
+<p><b>What Relay does:</b> a logistic regression on six warehouse-derived features, holdout AUC <b>0.827</b>, and its output directly sets priority and SLA. Score ≥ 0.7 → P1, 15-minute SLA. Below → P2, 4-hour SLA. The model is not a report; it changes what happens to the lead.</p>
+</li>
+<li>
+<h4>4. “Prototype and Scale GTM Innovation — rapidly build and test AI-native concepts and turn successes into SOP.”</h4>
+<p><b>What they're asking:</b> speed, and the judgment to know which prototypes deserve to become permanent.</p>
+<p><b>What Relay does:</b> it <em>is</em> the prototype. The thing that makes it SOP-ready rather than a toy is the audit log and the human approval gate — the two features that let an organisation actually trust it in production.</p>
+</li>
+</ol>
+
+<h2 id="reqs">The five requirements, and where you stand</h2>
+<table>
+<thead><tr><th style="width:30%">Requirement</th><th>Read on it</th></tr></thead>
+<tbody>
+<tr><td><b>Engineering-first mindset</b><br>5+ yrs GTM Systems / RevOps / Data Engineering</td><td>The tenure line is the known risk. The demo is your counterweight: it is not a portfolio piece, it is a working system with 109 tests. Bring the artifact, not the argument.</td></tr>
+<tr><td><b>Context Orchestrator</b><br>data flows across warehouses, APIs, MCP servers</td><td>Directly demonstrable. You have a warehouse, a JSON API, and an MCP server exposing the same data through three tools. Show the MCP call.</td></tr>
+<tr><td><b>Shipping GTM logic</b><br>scoring, routing, lifecycle automation</td><td>Scoring and routing are both in the demo end to end. Lifecycle automation is the thinner one — be ready to talk about it as a next step rather than a claim.</td></tr>
+<tr><td><b>Orchestrating LLMs, enrichment waterfalls, agentic workflows</b></td><td>LLM orchestration with guardrails: yes, and with the failure path built. “Enrichment waterfall” is Clay's term — see the vocabulary section; Relay's stage sequence is the same shape.</td></tr>
+<tr><td><b>Structured problem-solving; simplify rather than add complexity</b></td><td>Your strongest and least obvious card. Point at what you <em>refused</em> to build: no fake data to fill tables, no metric that isn't a real query.</td></tr>
+</tbody>
+</table>
+
+<!-- ===================== PART 2 ===================== -->
+<h2 id="what">What Relay actually is</h2>
+
+<p class="lede">A lead arrives. The system matches it to an account, enriches it from a warehouse, judges intent, scores it with a trained model, routes it to a rep, and stops for a human — writing an unforgeable record of every step.</p>
+
+<p>That sentence is the whole product. Everything else is detail.</p>
+
+<div class="grid2">
+<div class="card"><h4>The mental model</h4><p style="margin-bottom:0">A <b>mail room with a paper trail</b>. A letter arrives with no address. A clerk works out which company it's for, pulls their file, reads what they want, checks how hot they are, decides who handles it — then puts it in an out-tray for a supervisor instead of delivering it. Every step gets stamped into a logbook that can only be added to.</p></div>
+<div class="card"><h4>The numbers, live</h4>
+<ul style="margin-bottom:0;font-size:14.5px">
+<li>3,294 lines of Python across 12 modules</li>
+<li>109 automated tests, all passing</li>
+<li>40 accounts · 120 contacts · 748 activities · 80 opportunities</li>
+<li>43 inbound leads → 263 audit records, all distinct</li>
+<li>Holdout AUC 0.827 on 6 features</li>
+<li>Runs fully offline in seconds</li>
+</ul></div>
+</div>
+
+<h2 id="why">Why build this instead of talking about it</h2>
+
+<p>The JD says <b>“we aren't just looking for someone to manage tools, we want a builder.”</b> Every other candidate will <em>say</em> they're a builder. The demo is the only form of that claim that can't be faked in an interview.</p>
+
+<p>But there's a second, sharper reason, and it's the one to lead with:</p>
+
+<div class="say">
+<p style="margin:0"><b>Say:</b> “The hard part of agentic GTM isn't making the AI work. It's making it trustworthy enough that a VP will let it touch the funnel. So I built the governance first: every decision is logged with a hash of its inputs, every AI step has a deterministic fallback, and no assignment is ever written without a human approving it. The AI is the easy half.”</p>
+</div>
+
+<p>That reframe does three things at once: it shows you understand their actual blocker, it separates you from candidates demoing a chatbot, and it makes the boring parts of your build (audit log, HITL gate, fallbacks) into the headline instead of the footnotes.</p>
+
+<h2 id="arch">Architecture in one picture</h2>
+
+<div class="flow">
+data/inbound/*.json                    ← inbound signal (structured + free text)
+        │
+   <b>1 MATCH</b>  rapidfuzz, 3-band policy ──→ <b>2 TIE-BREAK</b>  LLM, or deterministic fallback
+        │
+   <b>3 ENRICH</b>  DuckDB star schema: accounts · contacts · activities · opportunities
+        │
+   <b>4 INTENT</b>  LLM summary, or keyword fallback
+        │
+   <b>5 SCORE</b>  logistic regression, features computed as of the scoring clock
+        │
+   <b>6 ROUTE</b>  territory map → availability-aware round-robin → SLA tier
+        │
+   <b>7 HITL GATE</b> ──→ approve / reject        every stage → runs/audit.jsonl
+</div>
+
+<p>Two of those seven stages are probabilistic (2 and 4). Five are deterministic. That ratio <em>is</em> the “blending” the JD asks for, and you can point at it on screen.</p>
+
+<h2 id="stages">The seven stages, in depth</h2>
+
+<h3>1 · Match — which account is this lead?</h3>
+<p>An inbound lead says “Hine Metric Co.” Your warehouse has “Hivemetric” and “Pinemetric.” Which is it?</p>
+<p>Relay tries the cheap, certain thing first: if the lead has a domain and that domain exactly matches an account, done — confidence 100, method <code>domain_exact</code>. No fuzziness, no AI.</p>
+<p>If there's no domain, it falls back to fuzzy name matching with <b>rapidfuzz</b> (a fast string-similarity library) and applies a <b>three-band policy</b>:</p>
+<table>
+<thead><tr><th>Score</th><th>Band</th><th>What happens</th></tr></thead>
+<tbody>
+<tr><td>≥ 90</td><td><span class="tag t-ok">AUTO-MATCH</span></td><td>Confident. Proceed.</td></tr>
+<tr><td>70 – 89</td><td><span class="tag t-warn">AMBIGUOUS</span></td><td>Escalate to the tie-break stage. This is where AI earns its keep.</td></tr>
+<tr><td>&lt; 70</td><td><span class="tag t-bad">NO MATCH</span></td><td>Create a new account, route to manual review. Never guess.</td></tr>
+</tbody>
+</table>
+<div class="card"><p style="margin:0"><b>Why three bands and not one threshold:</b> a single cutoff forces every borderline case into a wrong answer. Three bands create a middle zone where the system says “I'm not sure” — and being able to say that is what makes the confident answers believable.</p></div>
+
+<h3>2 · Tie-break — the first AI judgment call</h3>
+<p>“Hine Metric Co” scores 85.7 against <em>both</em> Hivemetric and Pinemetric. A rule can't break that tie sensibly; a human would look at it and think. That is exactly the shape of problem an LLM is good at.</p>
+<p>So Relay asks an LLM to pick — but with a hard guardrail:</p>
+<pre><code>Guardrail: the LLM MUST answer with a name from the candidate list.
+Anything else (out-of-list, error, timeout, empty) → deterministic fallback.</code></pre>
+<p>The fallback sorts by <code>(-score, account_id)</code> — highest score wins, and when scores tie exactly, the lowest account id breaks it. In the demo both candidates sit at exactly 85.7, so <b>account id is what actually decides</b>, and the console says so in those words.</p>
+<div class="card key"><p style="margin:0"><b>This is the most interview-valuable thirty seconds in your whole demo.</b> It shows an LLM in the execution path, a guardrail that constrains its output to a valid set, a deterministic fallback when it can't answer, and an audit record that says which one decided. That is the entire JD in one stage.</p></div>
+
+<h3>3 · Enrich — pull the account's file</h3>
+<p>Deterministic. Queries the warehouse for the matched account's contacts, recent activities, and open opportunities. No AI, no ambiguity — this is a join.</p>
+<p>Worth knowing: the enrichment is where “context layer” becomes concrete. The lead arrived with seven fields. After enrichment the system knows the account's industry, size, territory, who works there, what they've been doing, and what's in the pipeline.</p>
+
+<h3>4 · Intent — the second AI judgment call</h3>
+<p>The lead's note reads: <em>“hey -- we're re-evaluating vendors,, budget already approved!! need pricing + integration details asap b4 end of Q.”</em></p>
+<p>An LLM classifies that into one of five labels and writes a short summary. The guardrails: the label must be from the allowed list, the summary must be ≤20 words and ≤200 characters, and control characters are stripped. Fail any check → deterministic keyword fallback.</p>
+<p>The keyword fallback scans for terms in priority order — pricing/price/cost/quote/budget → <code>pricing_inquiry</code>; demo/trial/walkthrough/meeting → <code>demo_request</code>; evaluat/compar/vendor/migration → <code>evaluation</code>; and so on.</p>
+<div class="card warn"><p style="margin:0"><b>Know this cold:</b> the summary is model-authored free text. The code comments say renderers must treat it as untrusted. That's prompt-injection awareness — a lead could write “ignore previous instructions” in their note. Mentioning this unprompted signals a level of care most candidates won't show.</p></div>
+
+<h3>5 · Score — the propensity model</h3>
+<p>Six features, computed <b>as of a fixed timestamp</b>, fed to a trained logistic regression. Covered in depth <a href="#model">below</a> — this is the stage most likely to get drilled.</p>
+
+<h3>6 · Route — territory, availability, SLA</h3>
+<p>Fully deterministic, three steps:</p>
+<ol>
+<li><b>Territory.</b> Country → territory via an explicit map. United States splits by state: 27 eastern states → AMER-East, everything else → AMER-West. Germany → EMEA. Japan → APAC.</li>
+<li><b>Round-robin with availability.</b> Walk the territory's rep roster from the stored rotation cursor. <b>If a rep is unavailable, skip them — and write a <code>routing_skip</code> audit record saying who was skipped and why.</b> In the demo Priya Raman is on vacation; she has 0 routed and 9 skipped.</li>
+<li><b>SLA tier.</b> Propensity ≥ 0.7 → P1, 15 minutes. Below → P2, 240 minutes.</li>
+</ol>
+<div class="card"><p style="margin:0"><b>Why the skip being audited matters:</b> in most routing systems, a skip is invisible — the lead just lands somewhere and nobody knows why. When a VP asks “why didn't Priya get that lead,” Relay has the answer as a record. That's the difference between automation and <em>accountable</em> automation.</p></div>
+
+<h3>7 · HITL gate — the stop</h3>
+<p>HITL = <b>Human In The Loop</b>. The pipeline computes a full proposal, writes it to <code>runs/pending/&lt;lead_id&gt;.json</code>, and <b>stops</b>. Nothing is assigned.</p>
+<p>A later approve or reject consumes that stored proposal <em>exactly as it was shown</em> — it does not re-run the pipeline and does not advance the round-robin a second time. If the pending file is corrupt, the run <b>fails closed</b>: the discard is audited and the run stops, so an unseen proposal can never be auto-applied.</p>
+
+<!-- ===================== PART 3 ===================== -->
+<h2 id="modules">Every module, and why it exists</h2>
+<table>
+<thead><tr><th style="width:24%">Module</th><th style="width:8%">Lines</th><th>What it does and why it's separate</th></tr></thead>
+<tbody>
+<tr><td><code>pipeline.py</code></td><td>732</td><td>The orchestrator. Runs the seven stages in order, owns the LLM calls and their fallbacks, owns the HITL gate. Everything else is a library it calls.</td></tr>
+<tr><td><code>ui.py</code></td><td>658</td><td>A stdlib-only HTTP server (no framework) exposing 11 JSON endpoints plus the console. Zero dependencies means it can't fail to start on stage.</td></tr>
+<tr><td><code>warehouse.py</code></td><td>554</td><td>The data layer: DuckDB schema, the deterministic seed generator, and the query helpers. Also owns <code>demo_as_of()</code> — the scoring clock.</td></tr>
+<tr><td><code>leadgen.py</code></td><td>389</td><td>Generates inbound leads and verifies each against the real matcher before keeping it, so the advertised path mix is measured rather than assumed.</td></tr>
+<tr><td><code>mcp_server.py</code></td><td>200</td><td>Exposes the warehouse as three MCP tools. This is the “context layer” the JD names.</td></tr>
+<tr><td><code>routing.py</code></td><td>171</td><td>Territory resolution, availability-aware round-robin, rotation state on disk, SLA tiers.</td></tr>
+<tr><td><code>features.py</code></td><td>129</td><td>Feature engineering with strict as-of semantics. The same code path serves training and live scoring, so train/serve skew is <em>structurally</em> impossible.</td></tr>
+<tr><td><code>model.py</code></td><td>116</td><td>Trains and loads the propensity model. StandardScaler + LogisticRegression in a single sklearn pipeline.</td></tr>
+<tr><td><code>demo.py</code></td><td>101</td><td>The terminal CLI used in the 5-minute script.</td></tr>
+<tr><td><code>matching.py</code></td><td>89</td><td>Exact-domain shortcut, then fuzzy name with the 3-band policy. Deliberately contains no LLM.</td></tr>
+<tr><td><code>config.py</code></td><td>89</td><td>Seed, paths, territory map, rep rosters, industry fit. One place to change behaviour.</td></tr>
+<tr><td><code>audit.py</code></td><td>63</td><td>Append-only JSONL writer with SHA-256 input hashing. The smallest and most important file in the repo.</td></tr>
+</tbody>
+</table>
+
+<div class="card"><p style="margin:0"><b>If they ask “why is <code>features.py</code> separate from <code>model.py</code>?”</b> — because training and live scoring must compute features the same way. If they diverge, your model performs beautifully in testing and badly in production. That failure is called <b>train/serve skew</b>, and putting both behind one function is how you make it impossible rather than merely unlikely.</p></div>
+
+<h2 id="model">The propensity model, in depth</h2>
+
+<p>This is the stage most likely to get drilled, because responsibility #3 is “lead our predictive modeling efforts.”</p>
+
+<h3>What it predicts</h3>
+<p>Given an account's engagement <em>before</em> an opportunity was created, how likely was that opportunity to be won? Trained on 60 labelled rows (30 won, 30 lost), 42 train / 18 holdout.</p>
+
+<h3>The six features and their trained weights</h3>
+<table>
+<thead><tr><th>Feature</th><th style="width:14%">Weight</th><th>Reading</th></tr></thead>
+<tbody>
+<tr><td><code>activity_count_30d</code></td><td><b style="color:var(--ok)">+1.8313</b></td><td>Engagement volume in the 30 days before the as-of date. Dominant signal by a wide margin.</td></tr>
+<tr><td><code>prior_opportunity_count</code></td><td><b style="color:var(--ok)">+0.7530</b></td><td>Prior deals with this account. A relationship history helps.</td></tr>
+<tr><td><code>industry_fit</code></td><td><b style="color:var(--bad)">−0.5805</b></td><td>Whether the industry is in the product's sweet spot. <b>Negative — counter-intuitive.</b> See below.</td></tr>
+<tr><td><code>days_since_last_activity</code></td><td><b style="color:var(--bad)">−0.5572</b></td><td>Recency. More days since last touch → lower propensity. Sign is intuitive.</td></tr>
+<tr><td><code>employee_band</code></td><td><b style="color:var(--bad)">−0.3265</b></td><td>Company size as an ordinal.</td></tr>
+<tr><td><code>distinct_contacts_engaged</code></td><td><b style="color:var(--ok)">+0.2010</b></td><td>Multi-threading. More people engaged → better, but weakly.</td></tr>
+<tr><td colspan="3" style="background:var(--sunk)"><b>intercept −0.1488</b> · holdout AUC <b>0.827</b></td></tr>
+</tbody>
+</table>
+
+<div class="card warn">
+<h4>Be ready for: “why is industry_fit negative?”</h4>
+<p style="margin-bottom:0">This is the sharpest question available and you should welcome it. The honest answer: on 60 rows of generated data, a weak feature can easily pick up the wrong sign — that is what a small sample does. It's a real property of the fitted model, not something to explain away. The right response is <b>“that's a sign the feature isn't carrying real signal at this sample size, and in production I'd want either more data or that feature dropped.”</b> Saying that demonstrates you read your own model output rather than shipping it blind.</p>
+</div>
+
+<h3>Why AUC 0.827 and not 0.99</h3>
+<p>AUC = Area Under the ROC Curve. Plain reading: <b>given one won deal and one lost deal at random, how often does the model rank the won one higher?</b> 0.5 is a coin flip. 1.0 is perfect.</p>
+<p>0.827 is good. <b>0.99 would be a red flag</b> — on 60 rows, near-perfect separation almost always means leakage: the model saw something it wouldn't have at prediction time. The demo has a test that <em>enforces</em> the band: <code>0.65 &lt; AUC &lt; 0.99</code>. A test that fails when your model looks too good is an unusual and very defensible thing to have written.</p>
+
+<h3>The scoring clock — the leakage guard</h3>
+<p>Every feature is computed <b>as of a fixed timestamp</b> (currently <code>2026-06-17 19:08</code>), derived as the newest opportunity's creation date plus one hour.</p>
+<p>Training rows use each opportunity's own <code>created_at</code> — so only activity in the 30 days <em>before</em> that opportunity existed counts. Live scoring uses the same function.</p>
+<p>Crucially, <b>the warehouse deliberately contains facts after the clock</b> that the model is not allowed to see. Those rows are chipped <span class="tag t-brand">post-clock</span> in the Opportunities table.</p>
+<div class="say"><p style="margin:0"><b>Say:</b> “If nothing existed after the scoring clock, the guard would be meaningless — you can't prove you're not peeking if there's nothing to peek at. The later data is there on purpose, and the UI marks it.”</p></div>
+
+<h3>Explainability</h3>
+<p>For any score, the console shows every feature's contribution: <code>coefficient × standardized feature value</code>, the exact terms the model summed, ending in <code>sigmoid(intercept + Σ contributions)</code>. The arithmetic closes to the score displayed everywhere else in the app.</p>
+
+<h2 id="gov">The governance layer</h2>
+
+<h3>The audit log</h3>
+<p>One append-only JSONL file. One line per decision. Each record carries:</p>
+<pre><code>{
+  "ts":            "2026-08-06T22:20:53+00:00",
+  "stage":         "routing_skip",
+  "lead_id":       "L-1001",
+  "inputs":        { "territory": "EMEA", "rep": "Priya Raman" },
+  "inputs_sha256": "fdd0b8cc088e2a3f...",
+  "decision":      { "skipped_rep": "Priya Raman", "reason": "rep_unavailable" },
+  "rule_fired":    "skip_unavailable_rep",
+  "fallback_used": false
+}</code></pre>
+<p>Twelve stage types can be emitted, including the unhappy paths: <code>llm_unavailable</code>, <code>pending_discarded</code>, <code>pipeline_error</code>, <code>routed_to_review</code>.</p>
+
+<div class="card ok">
+<h4>Why the input hash is the clever part</h4>
+<p style="margin-bottom:0">Anyone can log “I assigned this lead to Tomas.” The SHA-256 of the inputs lets you prove <em>what the system was looking at</em> when it decided. Same hash + same rule = same decision, reproducibly. That turns the log from a diary into <b>evidence</b>. If two records share an input hash and a rule, that's a determinism proof, not a duplicate.</p>
+</div>
+
+<h3>The three guarantees, in the order they matter</h3>
+<ol>
+<li><b>Append-only.</b> Nothing in the codebase can truncate or rewrite the log.</li>
+<li><b>Fail closed.</b> A corrupt pending proposal is discarded, audited, and the run stops. It is never auto-applied.</li>
+<li><b>No silent AI.</b> Every fallback sets <code>fallback_used: true</code>. You can always tell whether an AI or a rule produced an answer.</li>
+</ol>
+
+<h2 id="mcp">The MCP context layer</h2>
+<p><b>MCP = Model Context Protocol.</b> An open standard for exposing data and tools to AI agents in a way any compatible client can consume. Think of it as <b>USB for AI context</b>: instead of writing a bespoke integration per model, you expose a tool once and any MCP client can call it.</p>
+<p>The JD names MCPs explicitly in responsibility #1, so this is not optional vocabulary.</p>
+<p>Relay exposes three read tools:</p>
+<table>
+<thead><tr><th style="width:26%">Tool</th><th>Returns</th></tr></thead>
+<tbody>
+<tr><td><code>lookup_account(query)</code></td><td>Ranked match candidates with scores and the policy thresholds — <b>the same scoring code the pipeline's matcher uses</b>, not a reimplementation.</td></tr>
+<tr><td><code>account_context(account_id)</code></td><td>The full account file plus its current propensity score.</td></tr>
+<tr><td><code>territory_rules()</code></td><td>Rep rosters, territory maps and SLA tiers — the config the router reads at decision time.</td></tr>
+</tbody>
+</table>
+<div class="say"><p style="margin:0"><b>Say:</b> “The MCP server isn't a second implementation — it calls the same matcher the pipeline calls. An agent asking ‘which account is this' gets the identical answer the routing engine would get. That's what makes it a context layer rather than a reporting API.”</p></div>
+
+<h2 id="console">The console, screen by screen</h2>
+<table>
+<thead><tr><th style="width:22%">Screen</th><th>What it proves</th></tr></thead>
+<tbody>
+<tr><td><b>Routing Overview</b></td><td>The engine's own record of itself. The stat to point at is <b>FALLBACKS 15.6%</b> — how often an AI step degraded to a rule and the system kept working.</td></tr>
+<tr><td><b>Routing Queue</b></td><td>43 inbound leads with their real last outcome, owner, priority and propensity.</td></tr>
+<tr><td><b>Lead record</b></td><td>The differentiator. Attribute rail, six real numbers with provenance, the decision trace, and the stage waterfall.</td></tr>
+<tr><td><b>Decision trace</b></td><td><b>Solid line = the path this lead took, labelled with the condition that routed it. Dashed grey = a branch the flow defines but this lead didn't take. Dotted = a result.</b> Drawn from this run's audit records — a different lead draws a different diagram.</td></tr>
+<tr><td><b>Stage waterfall</b></td><td>Per-stage <code>Source</code> chip: WAREHOUSE / MODEL / RULE / FALLBACK. Answers “which subsystem produced this answer.”</td></tr>
+<tr><td><b>Propensity v1</b></td><td>Coefficients, the contribution breakdown, and all 40 accounts scored by the same model.</td></tr>
+<tr><td><b>Audit Log</b></td><td>263 decisions with rule and input hash. The artifact everything rests on.</td></tr>
+<tr><td><b>Territory Management</b></td><td>The literal maps the router reads, plus coverage maths — accounts per <em>available</em> rep. Priya's absence shows as Tomas carrying all 7 EMEA accounts alone.</td></tr>
+</tbody>
+</table>
+
+<h3>The two beats, and why they differ</h3>
+<table>
+<thead><tr><th></th><th><code>?demo=lead_001</code></th><th><code>?demo=lead_002</code></th></tr></thead>
+<tbody>
+<tr><td><b>match</b></td><td>exact domain, score 100</td><td>ambiguous, two candidates tied at 85.7</td></tr>
+<tr><td><b>tie-break</b></td><td>not needed</td><td>fires — resolved by lowest account id</td></tr>
+<tr><td><b>score</b></td><td><b style="color:var(--hot)">0.9727</b></td><td><b>0.0017</b></td></tr>
+<tr><td><b>priority</b></td><td>P1 · 15-min SLA</td><td>P2 · 4-hour SLA</td></tr>
+<tr><td><b>the twist</b></td><td>EMEA's first rep is on vacation — the skip is <b>audited, not silent</b></td><td>a fuzzy match a human would also have to think about</td></tr>
+</tbody>
+</table>
+
+<!-- ===================== PART 4 ===================== -->
+<h2 id="map">JD → demo mapping (the money table)</h2>
+<p>If you memorise one thing, memorise this. It converts every line of their JD into something you can point at.</p>
+<table>
+<thead><tr><th style="width:34%">They asked for</th><th>Point at</th></tr></thead>
+<tbody>
+<tr><td>Unified data layer merging structured + unstructured</td><td>DuckDB star schema (4 joined tables) + the free-text <code>notes</code> field that gets classified</td></tr>
+<tr><td>DataLake / APIs / MCPs</td><td>DuckDB warehouse · 11 JSON endpoints · MCP server with 3 tools</td></tr>
+<tr><td>Agentic workflows in the execution path</td><td>The 7-stage pipeline — if it stops, leads stop moving</td></tr>
+<tr><td>Blending probabilistic with deterministic</td><td>2 LLM stages, 5 deterministic; every LLM stage has a fallback; 15.6% fallback rate in the live log</td></tr>
+<tr><td>Own scoring and propensity models</td><td>Logistic regression, 6 features, AUC 0.827, with an enforced credible band</td></tr>
+<tr><td>Integrated into the orchestration layer</td><td>The score <em>sets</em> P1/P2 and the SLA — it isn't a report</td></tr>
+<tr><td>Prototype → SOP</td><td>The audit log and HITL gate are what make it deployable rather than a toy</td></tr>
+<tr><td>Simplify rather than add complexity</td><td>Stdlib-only server, no framework, no network, 109 tests, one self-contained HTML file</td></tr>
+</tbody>
+</table>
+
+<h2 id="vocab">Vocabulary you must own</h2>
+<table>
+<thead><tr><th style="width:24%">Term</th><th>Say it like this</th></tr></thead>
+<tbody>
+<tr><td><b>GTM</b></td><td>Go-To-Market — marketing, sales and CX as one motion.</td></tr>
+<tr><td><b>RevOps</b></td><td>Revenue Operations. The team that owns the systems and data behind that motion.</td></tr>
+<tr><td><b>Agentic</b></td><td>An AI that takes a sequence of actions, where each result feeds the next decision — not a single question and answer.</td></tr>
+<tr><td><b>Deterministic</b></td><td>A rule. Same input, same output, every time. Auditable.</td></tr>
+<tr><td><b>Probabilistic</b></td><td>A model or LLM. Handles mess, can be wrong, harder to explain.</td></tr>
+<tr><td><b>Context layer</b></td><td>What serves the right facts to an AI at decision time. Storage is the warehouse; delivery is the context layer.</td></tr>
+<tr><td><b>MCP</b></td><td>Model Context Protocol — an open standard for exposing data and tools to AI agents. USB for AI context.</td></tr>
+<tr><td><b>Enrichment waterfall</b></td><td>Clay's term: try provider 1; if it fails, try provider 2; then 3 — each row shows which step produced the answer. Relay's stage sequence with per-stage source chips is the same shape.</td></tr>
+<tr><td><b>Propensity model</b></td><td>A model that scores how likely an account is to convert, from behavioural signals.</td></tr>
+<tr><td><b>AUC</b></td><td>Given one won and one lost deal at random, how often the model ranks the won one higher. 0.5 = coin flip, 1.0 = perfect (and suspicious).</td></tr>
+<tr><td><b>Leakage</b></td><td>The model saw something at training time it wouldn't have at prediction time. Produces great test scores and bad production performance.</td></tr>
+<tr><td><b>Train/serve skew</b></td><td>Features computed differently in training vs production. Same failure mode, different cause.</td></tr>
+<tr><td><b>HITL</b></td><td>Human In The Loop. The system proposes; a person disposes.</td></tr>
+<tr><td><b>Lead-to-account matching</b></td><td>Working out which existing account an inbound lead belongs to. <b>This is LeanData's core product.</b></td></tr>
+<tr><td><b>Round-robin</b></td><td>Distributing leads evenly across a rep roster by rotating a cursor.</td></tr>
+<tr><td><b>SLA</b></td><td>Service Level Agreement — here, how fast a rep must act on an assigned lead.</td></tr>
+<tr><td><b>Idempotent</b></td><td>Doing it twice has the same effect as doing it once. Relay's approve is idempotent — it replays the recorded outcome rather than re-running.</td></tr>
+</tbody>
+</table>
+
+<div class="card key"><p style="margin:0"><b>The one term to be sharpest on:</b> <b>lead-to-account matching</b> is what LeanData sells. Your stages 1 and 2 <em>are</em> that problem, with a three-band policy and an AI tie-break. You didn't build a demo that happens to be adjacent to their product — you built their core problem and added a governance layer on top. Say that out loud.</p></div>
+
+<h2 id="qa">Questions they'll ask, and how the demo answers</h2>
+
+<details><summary>“Walk me through what you built.”</summary>
+<div class="a"><p>Use the one-sentence version, then the mail-room analogy, then offer the screen. Don't start with the tech stack — start with what it does for a revenue team.</p>
+<p><b>“A lead arrives. The system matches it to an account, enriches it from a warehouse, judges intent, scores it with a trained model, routes it to a rep, and stops for a human — writing an unforgeable record of every step.”</b></p></div></details>
+
+<details><summary>“Is any of this real, or is it mock data?”</summary>
+<div class="a"><p>Answer directly, no hedging: the sample database is generated, like any demo's. What's real is everything downstream — every score, routing decision and audit record comes from actually running the pipeline. Nothing is typed in.</p>
+<p>Then go further, because this is a strength: the lead generator <em>verifies</em> each generated lead against the real matcher before keeping it, so the advertised path mix is measured rather than assumed.</p></div></details>
+
+<details><summary>“What happens when the LLM is down?”</summary>
+<div class="a"><p><b>It already is</b> — there's no API key set in the demo. Every AI step has a deterministic fallback, the fallback is recorded with <code>fallback_used: true</code>, and the run completes. That's what the 15.6% counts.</p>
+<p>The stronger version: “I built the failure path first, because a system that only works when the LLM is up can't sit in the execution path of a funnel.”</p></div></details>
+
+<details><summary>“How do you know your model isn't overfit?”</summary>
+<div class="a"><p>Three answers, in order of strength: (1) holdout AUC 0.827, not 0.99 — near-perfect separation on 60 rows would mean leakage; (2) there's a test that <em>fails</em> if AUC exceeds 0.99; (3) features are computed as-of a fixed clock through the same code path in training and serving, so train/serve skew is structurally impossible rather than just unlikely.</p></div></details>
+
+<details><summary>“Why logistic regression and not something modern?”</summary>
+<div class="a"><p>Because with 60 labelled rows, a gradient-boosted model would fit noise. And because coefficients are directly inspectable — you can show a VP exactly why an account scored what it scored, which matters more than a point of AUC when you're asking someone to trust automated routing.</p>
+<p>Then flag the upgrade path honestly: with real volume you'd revisit, and you'd want calibration, not just ranking.</p></div></details>
+
+<details><summary>“How would this scale to our actual volume?”</summary>
+<div class="a"><p>Be honest about what changes. DuckDB is single-node — at real volume the warehouse becomes Snowflake or BigQuery, but the feature code doesn't change because it's already isolated. The pipeline is stateless per lead, so it parallelises. The append-only audit log becomes a real event store. The HITL gate becomes a queue with an SLA on the approver, not just on the rep.</p>
+<p>What does <em>not</em> change: the three-band matching policy, the fallback discipline, and the audit contract. Say which parts survive scale and which don't — that's the answer of someone who's thought about production.</p></div></details>
+
+<details><summary>“What would you do in your first 90 days here?”</summary>
+<div class="a"><p>Don't pitch a rebuild. Say you'd map the existing decision points first — where does a lead currently stop moving, and who has to touch it — then instrument before automating: you can't prove an agentic workflow helped if you never measured the manual one. Then pick the highest-friction, most-auditable decision and automate <em>that</em> one end to end, with the governance in place from day one.</p>
+<p>This mirrors the JD's “simplify and automate rather than add complexity.”</p></div></details>
+
+<details><summary>“What's the hardest part of agentic GTM?”</summary>
+<div class="a"><p>The reframe from the <a href="#why">Why</a> section. Not making the AI work — making it trustworthy enough that a VP lets it touch the funnel. Then point at the audit log, the fallbacks and the HITL gate as the three things that buy that trust.</p></div></details>
+
+<details><summary>“Tell me about something in the build you got wrong.”</summary>
+<div class="a"><p>Have a real one ready — it's a credibility question, not a trap. A true one from this build: the console's routing view initially printed each rep's <em>territory</em> totals on their own row, so the visible column summed to double its own footer. It was caught by review, and the fix was to derive per-rep share honestly rather than delete the column.</p>
+<p>Or the deeper one: deal amounts and the model's signal were drawing from the same random stream, so a cosmetic pricing change silently swung holdout AUC between 0.605 and 0.901. Numbers were moving for reasons unrelated to the data's meaning. Splitting them into separate generators fixed it. That story shows you notice when a number moves for the wrong reason.</p></div></details>
+
+<h2 id="gaps">What you did NOT build — say these before they ask</h2>
+<p>Volunteering limits is a credibility multiplier. Each of these has a good honest framing.</p>
+<table>
+<thead><tr><th style="width:30%">Gap</th><th>How to frame it</th></tr></thead>
+<tbody>
+<tr><td>No live Salesforce/CRM write-back</td><td>The HITL gate is where that write would go. The proposal is fully formed and persisted; connecting it to a CRM API is an integration, not a redesign.</td></tr>
+<tr><td>No unstructured call/email ingestion</td><td>The unstructured path exists but is text notes only. Calls and transcripts would be the same stage with a different input adapter.</td></tr>
+<tr><td>Small training set (60 rows)</td><td>Stated openly in the model card. It's why logistic regression and why the AUC band is enforced.</td></tr>
+<tr><td>Single-node warehouse</td><td>DuckDB was chosen so the whole thing runs offline in seconds. Feature code is isolated from storage, so the swap is contained.</td></tr>
+<tr><td>Generated sample data</td><td>Like any demo. Say it plainly and immediately pivot to what <em>is</em> real: everything downstream of the engine.</td></tr>
+<tr><td>One narrative arrangement</td><td>The account the hot lead matches has a deliberate engagement surge in the sample data so the demo can show a P1 and a P2 side by side. It's scored by the same model on the same features as every other account. Know this so you're never caught by it.</td></tr>
+</tbody>
+</table>
+
+<h2 id="quiz">Quiz yourself</h2>
+<p>Answer out loud before opening each one. If you can't answer eight of these cleanly, re-read the relevant section rather than the whole guide.</p>
+
+<details><summary>1. What are the three bands in the matching policy, and why three instead of one threshold?</summary>
+<div class="a"><p>≥90 auto-match, 70–89 ambiguous, &lt;70 no-match. Three bands create a middle zone where the system can say “I'm not sure” and escalate. A single cutoff forces every borderline case into a confident wrong answer — and being able to admit uncertainty is what makes the confident answers believable.</p></div></details>
+
+<details><summary>2. An LLM returns a company name that isn't in the candidate list. What happens?</summary>
+<div class="a"><p>The guardrail rejects it and the deterministic fallback runs: sort by <code>(-score, account_id)</code>, take the first. The audit record shows <code>fallback_used: true</code> with rule <code>fallback_highest_score</code>. The LLM never gets to invent an account.</p></div></details>
+
+<details><summary>3. Both tie-break candidates score exactly 85.7. What actually decides?</summary>
+<div class="a"><p><b>The account id</b> — lowest wins. The score doesn't break the tie because it's identical. This matters: the console says “tied at 85.7 → lowest account id” rather than the vaguer “highest score,” because the vaguer version would be contradicted by the two equal numbers on screen.</p></div></details>
+
+<details><summary>4. What is the scoring clock and why does data exist after it?</summary>
+<div class="a"><p>A fixed timestamp that all features are computed as of — a leakage guard. Data exists after it <em>deliberately</em>: if nothing did, the guard would be unfalsifiable. Opportunities closing after it are chipped <span class="tag t-brand">post-clock</span> to make the boundary visible.</p></div></details>
+
+<details><summary>5. Why would an AUC of 0.99 be bad news?</summary>
+<div class="a"><p>On 60 rows, near-perfect separation almost always means leakage — the model saw something it wouldn't have at prediction time. There's a test that fails if AUC exceeds 0.99, which is an unusual thing to write and a very defensible one.</p></div></details>
+
+<details><summary>6. Which two of the seven stages are probabilistic, and what happens if both fail?</summary>
+<div class="a"><p>Tie-break (stage 2) and intent (stage 4). If both fail, both fall back to deterministic rules — highest-score-then-lowest-id for the tie-break, keyword scanning for intent — and the run completes normally with two <code>fallback_used: true</code> records. Nothing stalls.</p></div></details>
+
+<details><summary>7. What does the input hash in each audit record buy you?</summary>
+<div class="a"><p>Proof of <em>what the system was looking at</em> when it decided, not just what it decided. Same hash plus same rule means the same decision, reproducibly. It turns the log from a diary into evidence — and two records sharing a hash is a determinism proof, not a duplicate.</p></div></details>
+
+<details><summary>8. A rep is on vacation. What does the system do, and why does that matter?</summary>
+<div class="a"><p>The round-robin skips them and <b>writes a <code>routing_skip</code> audit record</b> naming who was skipped and why. It matters because in most routing systems a skip is invisible — the lead just lands somewhere and nobody can say why. Here, when a VP asks “why didn't Priya get that lead,” there's a record.</p></div></details>
+
+<details><summary>9. Why is feature engineering in its own module?</summary>
+<div class="a"><p>So training and live scoring compute features through the identical code path. If they diverge you get train/serve skew: great test scores, bad production performance. Sharing one function makes that failure <em>structurally impossible</em> rather than merely unlikely.</p></div></details>
+
+<details><summary>10. What is MCP and why does it appear in the JD?</summary>
+<div class="a"><p>Model Context Protocol — an open standard for exposing data and tools to AI agents, so you expose a tool once and any compatible client can call it. It's in responsibility #1 because LeanData wants a context layer any agent can consume, not a bespoke integration per model. Relay exposes three read tools, and <code>lookup_account</code> calls the same matcher the pipeline uses.</p></div></details>
+
+<details><summary>11. Nothing gets assigned automatically. Isn't that the opposite of "autonomous"?</summary>
+<div class="a"><p>This is the best question on the list and you should have a crisp answer. Autonomy is about the <em>reasoning</em> being automated, not the accountability. The system does all the work — matching, enrichment, judgment, scoring, routing — and stops at the one point where a human's signature has value. The gate is configurable; the discipline is that the default is safe. An organisation adopts automation by trusting it incrementally, and you can't earn that trust if the first version can write to the CRM unsupervised.</p></div></details>
+
+<details><summary>12. What is LeanData's core product, and how does your demo relate to it?</summary>
+<div class="a"><p>Lead-to-account matching and routing. Stages 1, 2 and 6 <em>are</em> that problem — three-band matching, an AI tie-break, and availability-aware round-robin with territory rules. You didn't build something adjacent to their product; you built their core problem and added a governance layer on top.</p></div></details>
+
+</main>
+</div>
+</body>
+</html>
