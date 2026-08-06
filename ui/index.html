@@ -224,7 +224,7 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 }
 .attr{display:flex;align-items:center;gap:9px;min-height:31px;padding:3px 16px}
 .attr:hover{background:var(--bg-hover)}
-.attr-k{display:flex;align-items:center;gap:7px;width:128px;flex:none;color:var(--ink-2);font-size:12.5px}
+.attr-k{display:flex;align-items:center;gap:7px;width:118px;flex:none;color:var(--ink-2);font-size:12.5px}
 .attr-k svg{width:12.5px;height:12.5px;opacity:.5;flex:none}
 .attr-k span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .attr-v{font-size:12.5px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
@@ -283,11 +283,11 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 .nd-box{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:1.5px}
 .nd-in{
   width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:5px 9px;text-align:center;gap:1px;overflow:hidden
+  padding:5px 7px;text-align:center;gap:1px;overflow:hidden
 }
-.nd-t{font-size:11.5px;font-weight:600;line-height:1.2;letter-spacing:-.005em;max-width:100%;
+.nd-t{font-size:11px;font-weight:600;line-height:1.2;letter-spacing:-.008em;max-width:100%;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nd-s{font-size:10px;line-height:1.25;opacity:.85;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nd-s{font-size:9.5px;line-height:1.25;opacity:.85;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nd-tag{
   position:absolute;top:-8px;left:50%;transform:translateX(-50%);font-size:8.5px;font-weight:700;
   letter-spacing:.06em;padding:1px 6px;border-radius:3px;white-space:nowrap;z-index:3
@@ -297,7 +297,7 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 .sh-pent{clip-path:polygon(0 0,100% 0,100% 68%,50% 100%,0 68%)}
 .sh-pent .nd-in{clip-path:polygon(0 0,100% 0,100% 68%,50% 100%,0 68%);padding-bottom:12px}
 .sh-dia{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
-.sh-dia .nd-in{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);padding:5px 30px}
+.sh-dia .nd-in{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);padding:5px 24px}
 .elbl{
   position:absolute;transform:translate(-50%,-50%);background:var(--bg);border:1px solid var(--line);
   font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;white-space:nowrap;z-index:2;color:var(--ink-2)
@@ -1556,7 +1556,7 @@ function vLead(v, token){
     ['i-user','Owner', `<span style="font-weight:550">${esc(rS.decision.rep)}</span>`],
     ['i-map','Routed territory', chip(rS.decision.territory, TERR_PAIR[rS.decision.territory])],
     ['i-rr','Rotation', `<span class="mono" style="font-size:11px">${esc(rS.rule_fired)}</span>`],
-    ['i-skip','Skipped', kS?chip(kS.decision.skipped_rep, PAIR.bad)+`<span style="color:var(--ink-3);font-size:11px"> ${esc(kS.decision.reason.replace(/_/g,' '))}</span>`:'<span class="none">not needed</span>'],
+    ['i-skip','Skipped', kS?chip(kS.decision.skipped_rep+' · unavailable', PAIR.bad):'<span class="none">not needed</span>'],
     ['i-shield','Status', applied?chip('ASSIGNMENT APPLIED',PAIR.ok):rejected?chip('REJECTED',PAIR.bad):chip('PENDING APPROVAL',PAIR.warn)],
   ]);
   const block = (title, node)=>{
@@ -1798,15 +1798,15 @@ let FLOW = null;
 function flowCanvas(run, st){
   const {mS,tS,eS,iS,sS,kS,rS} = st;
   const nodes = [], edges = [];
-  const L = 152, SPINE = 456, R = 778, R2 = 1036;
-  const SW = 202, SH = 54, GW = 188, GH = 48, RW = 210, RH = 52, PITCH = 96;
+  const L = 84, SPINE = 338, R = 574, R2 = 750;
+  const SW = 180, SH = 54, GW = 140, GH = 48, RW = 170, RH = 52, PITCH = 94;
   let y = 30;
 
   const add = o => { nodes.push(o); return o; };
   const spine  = o => add(Object.assign({x:SPINE-SW/2, y, w:SW, h:SH, shape:'rect'}, o));
-  const dia    = o => add(Object.assign({x:SPINE-113, y:y-8, w:226, h:70, shape:'dia'}, o));
+  const dia    = o => add(Object.assign({x:SPINE-101, y:y-8, w:202, h:70, shape:'dia'}, o));
   const result = o => add(Object.assign({x:R-RW/2, y:y+1, w:RW, h:RH, shape:'rect'}, o));
-  const far    = o => add(Object.assign({x:R2-98, y:y+1, w:196, h:RH, shape:'rect'}, o));
+  const far    = o => add(Object.assign({x:R2-71, y:y+1, w:142, h:RH, shape:'rect'}, o));
   const ghost  = o => add(Object.assign({x:L-GW/2, y:y+3, w:GW, h:GH, shape:'rect',
                                          tone:'ghost', ghost:true}, o));
   const flow   = (a,b,label,tone) => edges.push({a,b,label,tone});
@@ -1822,7 +1822,7 @@ function flowCanvas(run, st){
   /* 2 — match, with its three real outcomes */
   const status = mS ? mS.decision.status : null;
   const amb = status === 'ambiguous';
-  const nMatch = add(Object.assign({x:SPINE-SW/2, y, w:SW, h:60, shape:'pent', tag:'MATCH',
+  const nMatch = add(Object.assign({x:SPINE-SW/2, y, w:SW, h:62, shape:'pent', tag:'MATCH',
     tone: status==='matched' ? 'ok' : amb ? 'warn' : 'bad',
     t:'Lead matches Account?', s:mS?mS.rule_fired:'—'}));
   flow(nIn, nMatch, 'Insert');
@@ -1831,24 +1831,24 @@ function flowCanvas(run, st){
     if(amb){
       matchExit = 'Resolved by tie-break';
       const nc = result({tone:'warn', t:(mS.decision.candidates||[]).length+' candidates @ '+mS.decision.score,
-        s:(mS.decision.candidates||[]).map(c=>c.name).join(' · ')});
-      flow(nMatch, nc, 'Ambiguous · ≥ '+th.match_ambiguous, 'warn');
+        s:'ambiguous ≥ '+th.match_ambiguous+' · '+(mS.decision.candidates||[]).map(c=>c.name).join(' · ')});
+      flow(nMatch, nc, 'Ambiguous', 'warn');
       edges[edges.length-1].dir = 'r';
-      const nt = far({tone:'ok', tag:'TIE-BREAK', t:tS?tS.decision.account_name:'—', s:tS?tS.rule_fired:'—'});
+      const nt = add({x:R-RW/2, y:y+1+66, w:RW, h:RH, shape:'rect', tone:'ok', tag:'TIE-BREAK',
+        t:tS?tS.decision.account_name:'—', s:tS?tS.rule_fired:'—'});
       flow(nc, nt, 'Highest score', 'ok');
-      edges[edges.length-1].dir = 'r';
       notTaken(nMatch, ghost({t:'Exact domain match', s:'auto-match ≥ '+th.match_auto}), 'Match');
     } else if(status==='matched'){
       note(nMatch, result({tone:'ok', t:mS.decision.account_name,
         s:'account #'+mS.decision.account_id+' · confidence '+mS.decision.score}));
-      notTaken(nMatch, ghost({t:'Fuzzy name candidates', s:'ambiguous ≥ '+th.match_ambiguous}), 'No exact match');
+      notTaken(nMatch, ghost({t:'Fuzzy name match', s:'ambiguous ≥ '+th.match_ambiguous}), 'No exact match');
     } else {
       matchExit = 'No match';
       note(nMatch, result({tone:'bad', t:'No account matched', s:mS.rule_fired}));
       notTaken(nMatch, ghost({t:'Exact domain match', s:'auto-match ≥ '+th.match_auto}), 'Match');
     }
   }
-  y += PITCH + 6;
+  y += PITCH + (amb ? 70 : 6);
 
   /* 3 — enrich (only if the record has one) */
   let prev = nMatch;
