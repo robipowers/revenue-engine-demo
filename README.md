@@ -74,7 +74,7 @@ A pending run persists its proposal to `runs/pending/<lead_id>.json`. A later `-
    uv run python -m revenue_engine.demo data/inbound/lead_001.json --fresh
    ```
 
-   Say: "A German VP of RevOps asks for a demo. Domain match is exact (score 100), enrichment pulls her account context from the warehouse, the model scores the account 0.9351 on pre-opportunity engagement signals, so this is P1 with a 15-minute SLA. Watch the routing: EMEA's first rep is on vacation, and the audit tail shows a `routing_skip` record before the assignment lands on Tomas Lindqvist. The skip itself is audited, not silent."
+   Say: "A German VP of RevOps asks for a demo. Domain match is exact (score 100), enrichment pulls her account context from the warehouse, the model scores the account 0.9727 on pre-opportunity engagement signals, so this is P1 with a 15-minute SLA. Watch the routing: EMEA's first rep is on vacation, and the audit tail shows a `routing_skip` record before the assignment lands on Tomas Lindqvist. The skip itself is audited, not silent."
 
 2. **The messy lead.** Run:
 
@@ -82,7 +82,7 @@ A pending run persists its proposal to `runs/pending/<lead_id>.json`. A later `-
    uv run python -m revenue_engine.demo data/inbound/lead_002.json
    ```
 
-   Say: "This one is ugly: no domain, company typed as 'Hine Metric Co', sloppy notes. Fuzzy matching finds two candidates tied at 85.7 (Hivemetric and Pinemetric), which is exactly where an LLM tie-break earns its keep. Offline it collapses to a deterministic fallback, and the audit record says so (`fallback_used`). The account scores 0.0893, so P2, 4-hour SLA. The contrast with lead 1 is the model doing its job."
+   Say: "This one is ugly: no domain, company typed as 'Hine Metric Co', sloppy notes. Fuzzy matching finds two candidates tied at 85.7 (Hivemetric and Pinemetric), which is exactly where an LLM tie-break earns its keep. Offline it collapses to a deterministic fallback, and the audit record says so (`fallback_used`). The account scores 0.0017, so P2, 4-hour SLA. The contrast with lead 1 is the model doing its job."
 
 3. **Close the loop.** Run:
 
