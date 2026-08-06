@@ -968,7 +968,7 @@ function deskList(){
    never in what the record actually says. */
 function auditCols(compact){
   const cols = [
-    {key:'ts', label:'Timestamp', type:'time', w:compact?'140px':'150px',
+    {key:'ts', label:'Timestamp', type:'time', w:compact?'132px':'150px',
      render:r=>`<span class="mono">${fmtTime(r.ts)}</span>`, sort:r=>r.ts},
     {key:'stage', label:'Stage', type:'enum', w:compact?'146px':'150px',
      render:r=>chip(r.stage, AUD_PAIR[r.stage]||PAIR.mute),
@@ -976,10 +976,10 @@ function auditCols(compact){
     {key:'lead_id', label:'Lead', type:'mono', w:compact?'72px':'86px',
      render:r=>r.lead_id?`<span class="mono">${esc(r.lead_id)}</span>`:'<span style="color:var(--ink-3)">—</span>',
      foot:footUniq('lead_id')},
-    {key:'rule_fired', label:'Rule fired', type:'text', w:compact?'190px':'222px',
+    {key:'rule_fired', label:'Rule fired', type:'text', w:compact?'204px':'222px',
      render:r=>`<span class="mono" style="color:var(--ink)">${esc(r.rule_fired||'—')}</span>`,
      foot:rows=>`<b>${new Set(rows.map(r=>r.rule_fired)).size}</b> rules`},
-    {key:'fallback_used', label:'Fallback', type:'enum', w:compact?'88px':'104px',
+    {key:'fallback_used', label:'Fallback', type:'enum', w:compact?'74px':'104px',
      render:r=>r.fallback_used?chip('FALLBACK',PAIR.warn):'<span style="color:var(--ink-3)">—</span>',
      sort:r=>r.fallback_used?1:0,
      foot:rows=>`<b>${rows.filter(r=>r.fallback_used).length}</b> used`},
@@ -1024,25 +1024,25 @@ function accountCols(){
   return [
     {key:'name', label:'Account', type:'text', w:'184px',
      render:r=>`<span class="cell-id">${sq(r.name)}<span class="nm">${esc(r.name)}</span></span>`},
-    {key:'domain', label:'Domain', type:'link', w:'104px',
+    {key:'domain', label:'Domain', type:'link', w:'150px',
      render:r=>`<span style="color:var(--brand-ink)">${esc(r.domain)}</span>`},
-    {key:'industry', label:'Industry', type:'enum', w:'168px', render:r=>chip(r.industry, industryPair(r.industry)),
+    {key:'industry', label:'Industry', type:'enum', w:'162px', render:r=>chip(r.industry, industryPair(r.industry)),
      foot:footUniq('industry')},
-    {key:'employee_band', label:'Employees', type:'enum', w:'108px',
+    {key:'employee_band', label:'Employees', type:'enum', w:'104px',
      render:r=>chip(r.employee_band, BAND_PAIR[r.employee_band])},
-    {key:'territory', label:'Territory', type:'enum', w:'112px',
+    {key:'territory', label:'Territory', type:'enum', w:'108px',
      render:r=>chip(r.territory, TERR_PAIR[r.territory]), foot:footUniq('territory')},
-    {key:'propensity', label:'Propensity', type:'num', align:'r', w:'102px',
+    {key:'propensity', label:'Propensity', type:'num', align:'r', w:'98px',
      sort:r=>(sc[r.id]?sc[r.id].score:-1),
      render:r=>{ const x=sc[r.id];
        return x ? `<b style="font-weight:600;color:${x.score>=p1?'var(--hot)':'var(--ink)'}">${x.score.toFixed(4)}</b>`
                 : '<span style="color:var(--ink-3)">—</span>'; },
      foot:rows=>{ const v=rows.map(r=>sc[r.id]).filter(Boolean);
        return v.length ? `<b>${v.filter(x=>x.score>=p1).length}</b> P1` : '—'; }},
-    {key:'activities_30d', label:'Acts 30d', type:'num', align:'r', w:'90px',
+    {key:'activities_30d', label:'Acts 30d', type:'num', align:'r', w:'86px',
      render:r=>`<b style="font-weight:600">${r.activities_30d}</b><span style="color:var(--ink-3)"> / ${r.activities_total}</span>`,
      sort:r=>r.activities_30d, foot:footSum('activities_30d')},
-    {key:'days_since', label:'Days since', type:'num', align:'r', w:'92px',
+    {key:'days_since', label:'Days since', type:'num', align:'r', w:'86px',
      sort:r=>(sc[r.id]?sc[r.id].days_since_last_activity:1e9),
      render:r=>{ const x=sc[r.id];
        return x ? `${num(x.days_since_last_activity)}<span style="color:var(--ink-3)">d</span>`
@@ -1052,7 +1052,7 @@ function accountCols(){
     {key:'open_amount', label:'Open pipeline', type:'money', align:'r', w:'114px',
      render:r=>r.open_amount?moneyK(r.open_amount):'<span style="color:var(--ink-3)">—</span>',
      foot:footMoney('open_amount')},
-    {key:'won_amount', label:'Won', type:'money', align:'r', w:'126px',
+    {key:'won_amount', label:'Won', type:'money', align:'r', w:'118px',
      render:r=>r.won_amount?`<span style="color:var(--ok)">${moneyK(r.won_amount)}</span>`:'<span style="color:var(--ink-3)">—</span>',
      foot:footMoney('won_amount')},
   ];
@@ -1120,9 +1120,12 @@ function vOpps(v){
          : '');
      },
      foot:rows=>`<b>${rows.filter(r=>!r.closed_at).length}</b> still open`},
-    {key:'age_days', label:'Days to close', type:'num', align:'r', w:'116px',
-     render:r=>`${num(r.age_days)}<span style="color:var(--ink-3)">d</span>`,
-     foot:footAvg('age_days',0)},
+    {key:'age_days', label:'Age', type:'num', align:'r', w:'136px',
+     render:r=>`${num(r.age_days)}<span style="color:var(--ink-3)">d ${r.closed_at?'to close':'open'}</span>`,
+     foot:rows=>{
+       const closed = rows.filter(r=>r.closed_at);
+       return closed.length ? `<b>avg</b> ${(sum(closed,'age_days')/closed.length).toFixed(0)}d to close` : '—';
+     }},
   ];
   const open = S.opps.filter(o=>!o.outcome).reduce((a,o)=>a+o.amount,0);
   bookView(v,'Opportunities',
@@ -1365,24 +1368,37 @@ function vTerritories(v){
       won_amount: accs.reduce((s,a)=>s+a.won_amount,0),
       opps: opps.length,
       cursor: (S.desk.rotation||{})[name],
+      away: reps.filter(r=>!r.available).map(r=>r.name),
+      /* Coverage is the point of this page: an away rep does not shrink the
+         book, it concentrates it on whoever is still available. */
+      per_rep_accounts: accs.length / Math.max(1, reps.filter(r=>r.available).length),
+      per_rep_open: accs.reduce((s,a)=>s+a.open_amount,0)
+                    / Math.max(1, reps.filter(r=>r.available).length),
     };
   });
   const cols = [
-    {key:'name', label:'Territory', type:'enum', w:'152px', render:r=>chip(r.name, TERR_PAIR[r.name])},
-    {key:'accounts', label:'Accounts', type:'num', align:'r', w:'100px', foot:footSum('accounts')},
-    {key:'contacts', label:'Contacts', type:'num', align:'r', w:'100px', foot:footSum('contacts')},
-    {key:'acts30d', label:'Acts 30d', type:'num', align:'r', w:'100px', foot:footSum('acts30d')},
-    {key:'opps', label:'Opps', type:'num', align:'r', w:'88px', foot:footSum('opps')},
-    {key:'open_amount', label:'Open pipeline', type:'money', align:'r', w:'134px',
+    {key:'name', label:'Territory', type:'enum', w:'138px', render:r=>chip(r.name, TERR_PAIR[r.name])},
+    {key:'accounts', label:'Accounts', type:'num', align:'r', w:'92px', foot:footSum('accounts')},
+    {key:'contacts', label:'Contacts', type:'num', align:'r', w:'92px', foot:footSum('contacts')},
+    {key:'acts30d', label:'Acts 30d', type:'num', align:'r', w:'92px', foot:footSum('acts30d')},
+    {key:'opps', label:'Opps', type:'num', align:'r', w:'80px', foot:footSum('opps')},
+    {key:'open_amount', label:'Open pipeline', type:'money', align:'r', w:'126px',
      render:r=>money(r.open_amount), foot:footMoney('open_amount')},
     {key:'won_amount', label:'Won', type:'money', align:'r', w:'126px',
      render:r=>`<span style="color:var(--ok)">${money(r.won_amount)}</span>`, foot:footMoney('won_amount')},
-    {key:'reps', label:'Reps', type:'num', align:'r', w:'80px', foot:footSum('reps')},
-    {key:'unavailable', label:'Unavailable', type:'num', align:'r', w:'112px',
-     render:r=>r.unavailable?`<span style="color:var(--bad);font-weight:600">${r.unavailable}</span>`:'<span style="color:var(--ink-3)">0</span>',
-     foot:footSum('unavailable')},
-    {key:'cursor', label:'RR cursor', type:'num', align:'r', w:'104px',
-     render:r=>r.cursor!=null?`<span class="mono">${r.cursor}</span>`:'<span style="color:var(--ink-3)">—</span>'},
+    {key:'reps', label:'Coverage', type:'text', w:'186px',
+     sort:r=>r.reps-r.unavailable,
+     render:r=>`${r.reps-r.unavailable} of ${r.reps}`
+       + (r.unavailable?` ${chip(r.away.join(', ')+' away', PAIR.bad)}`
+                       :` <span style="color:var(--ink-3)">available</span>`),
+     foot:rows=>`<b>${rows.reduce((a,r)=>a+r.reps-r.unavailable,0)}</b> of ${rows.reduce((a,r)=>a+r.reps,0)} live`},
+    {key:'per_rep_accounts', label:'Accounts / rep', type:'num', align:'r', w:'118px',
+     sort:r=>r.per_rep_accounts, render:r=>r.per_rep_accounts.toFixed(1),
+     foot:rows=>`<b>avg</b> ${(rows.reduce((a,r)=>a+r.per_rep_accounts,0)/rows.length).toFixed(1)}`},
+    {key:'per_rep_open', label:'Pipeline / rep', type:'money', align:'r', w:'136px',
+     sort:r=>r.per_rep_open,
+     render:r=>`<span style="${r.unavailable?'color:var(--bad);font-weight:600':''}">${money(r.per_rep_open)}</span>`,
+     foot:rows=>`<b>max</b> ${money(Math.max(...rows.map(r=>r.per_rep_open)))}`},
   ];
   const h=el('div','phead');
   h.innerHTML=`<h2>Coverage</h2><div class="sp"></div><span class="pmeta">rollups computed from the account book</span>`;
@@ -1484,6 +1500,8 @@ function vModel(v){
       {key:'activity_count_30d', label:'Acts 30d', type:'num', align:'r', w:'98px', foot:footAvg('activity_count_30d',1)},
       {key:'distinct_contacts_engaged', label:'Engaged', type:'num', align:'r', w:'96px', foot:footAvg('distinct_contacts_engaged',1)},
       {key:'days_since_last_activity', label:'Days since', type:'num', align:'r', w:'104px', foot:footAvg('days_since_last_activity',0)},
+      {key:'prior_opportunity_count', label:'Prior opps', type:'num', align:'r', w:'104px',
+       foot:footSum('prior_opportunity_count')},
       {key:'employee_band', label:'Employees', type:'enum', w:'116px',
        render:r=>chip(r.employee_band, BAND_PAIR[r.employee_band])},
       {key:'industry_fit', label:'Industry fit', type:'enum', w:'116px',
@@ -1494,7 +1512,7 @@ function vModel(v){
     ];
     const host = el('div'); v.appendChild(host);
     renderTable(host,'scorebook',cols,scores,{unit:'accounts', sortKey:'score', sortDir:'desc',
-      hint:'prior_opportunity_count is 2 for every account at this clock, so it is omitted here'});
+      hint:'every feature here is the vector the model actually consumed'});
   }
 }
 
