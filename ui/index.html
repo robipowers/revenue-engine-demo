@@ -333,9 +333,17 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
   .strip-c:nth-child(-n+3){border-bottom:1px solid var(--line-soft)}
   .strip-c:nth-child(3n){border-right:none}
 }
+/* Below ~1180px the two-pane overview starves the decision stream, so the
+   queue and rep desk move under it and the stream takes the full width. */
+@media (max-width:1180px){
+  .split{grid-template-columns:minmax(0,1fr)}
+  .pane-l{border-right:none;border-bottom:1px solid var(--line)}
+  .pane-r{background:var(--bg)}
+  .pane-r .qwrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:9px;align-items:start}
+  .pane-r .qcard{margin-bottom:0}
+}
 @media (max-width:1100px){
   :root{--nav-w:196px}
-  .split{grid-template-columns:minmax(0,1fr) 296px}
   .rec{grid-template-columns:264px minmax(0,1fr)}
   .hl{grid-template-columns:repeat(2,1fr)}
   .kv{grid-template-columns:repeat(2,1fr)}
@@ -626,6 +634,10 @@ function renderTable(host, id, cols, rows, opts){
 
   const wrap = el('div','tw');
   const t = el('table','t');
+  /* Legibility floor: below this the pane scrolls horizontally instead of
+     crushing the flexible columns to nothing. Without it, a narrow viewport
+     silently drops the Decision column rather than letting the user reach it. */
+  t.style.minWidth = cols.reduce((a,c)=>a+(c.w?parseInt(c.w,10):200), 0)+'px';
   const cg = el('colgroup');
   cols.forEach(c=>{ const co=el('col'); if(c.w) co.style.width=c.w; cg.appendChild(co); });
   t.appendChild(cg);
@@ -805,9 +817,9 @@ function deskList(){
    never in what the record actually says. */
 function auditCols(compact){
   const cols = [
-    {key:'ts', label:'Timestamp', type:'time', w:compact?'128px':'150px',
+    {key:'ts', label:'Timestamp', type:'time', w:compact?'140px':'150px',
      render:r=>`<span class="mono">${fmtTime(r.ts)}</span>`, sort:r=>r.ts},
-    {key:'stage', label:'Stage', type:'enum', w:compact?'128px':'150px',
+    {key:'stage', label:'Stage', type:'enum', w:compact?'146px':'150px',
      render:r=>chip(r.stage, AUD_PAIR[r.stage]||PAIR.mute),
      foot:rows=>`<b>${new Set(rows.map(r=>r.stage)).size}</b> stages`},
     {key:'lead_id', label:'Lead', type:'mono', w:compact?'72px':'86px',
