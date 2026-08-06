@@ -9,7 +9,7 @@ date: 2026-08-05
 
 # feat: Autonomous revenue engine interview demo slice
 
-## Summary
+## Goal Capsule
 
 A self-contained, offline-safe demo of a miniature "autonomous revenue engine" for Robi's LeanData GTM Engineer (Data & AI) interview (Mon 2026-08-10): a DuckDB mini-warehouse with believable synthetic data, an MCP server exposing it as a context layer, a logistic-regression propensity score, and one agentic lead-routing workflow that blends LLM judgment (with deterministic fallbacks) with deterministic rules, a human-in-the-loop gate, and an append-only audit trail. One command replays an inbound lead end to end in under 5 minutes.
 
@@ -17,13 +17,15 @@ A self-contained, offline-safe demo of a miniature "autonomous revenue engine" f
 
 ---
 
-## Problem Frame
+## Product Contract
+
+### Problem Frame
 
 The LeanData JD (evaluation: `~/Downloads/career-ops/reports/131-leandata-2026-07-06.md`) asks for a unified data layer + APIs/MCPs + agentic workflows blending AI reasoning with deterministic logic + scoring/propensity models. Robi's three defendable gaps are warehouse depth, formal predictive modeling, and years-in-title. A small working artifact that *is* the JD closes all three with evidence. The demo must never die on stage: zero paid APIs required, zero network calls at demo time, LLM steps degrade gracefully to deterministic fallbacks.
 
 ---
 
-## Requirements
+### Requirements
 
 - **R1** — DuckDB warehouse with a star schema: `accounts`, `contacts`, `activities`, `opportunities`; seeded synthetic data with a coherent cross-table story (no lorem-ipsum names; activity patterns correlate with opportunity outcomes so the model learns real signal).
 - **R2** — MCP server (Python, official `mcp` SDK) exposing read tools over the warehouse: account lookup, account context (contacts + activity history), territory rules.
@@ -35,7 +37,7 @@ The LeanData JD (evaluation: `~/Downloads/career-ops/reports/131-leandata-2026-0
 
 ---
 
-## Scope Boundaries
+### Scope Boundaries
 
 **In scope:** everything in R1–R7, one demo CLI entrypoint, README demo script.
 
@@ -45,7 +47,9 @@ The LeanData JD (evaluation: `~/Downloads/career-ops/reports/131-leandata-2026-0
 
 ---
 
-## Key Technical Decisions
+## Planning Contract
+
+### Key Technical Decisions
 
 - **KTD1** *(session-settled: user-directed — chosen over Postgres: zero-install, single-file, demo-portable)* — **DuckDB** for the warehouse. Ships as a file in-repo; no daemon to fail on stage.
 - **KTD2** *(session-settled: user-directed — chosen over Node: Python-first constraint, sklearn adjacency)* — **Python throughout**, official `mcp` Python SDK (FastMCP server pattern), `scikit-learn` for the model, `rapidfuzz` for fuzzy matching.
@@ -56,7 +60,7 @@ The LeanData JD (evaluation: `~/Downloads/career-ops/reports/131-leandata-2026-0
 
 ---
 
-## High-Level Technical Design
+### High-Level Technical Design
 
 ```mermaid
 flowchart LR
@@ -78,7 +82,7 @@ The MCP server and the pipeline share one warehouse-access module — the MCP se
 
 ---
 
-## Output Structure
+### Output Structure
 
 ```text
 leandata-revenue-engine-demo/
