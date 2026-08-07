@@ -1,0 +1,18 @@
+{
+  "lead_id": "L-1001",
+  "proposal": {
+    "lead_id": "L-1001",
+    "account_id": 26,
+    "account_name": "Meterhouse",
+    "rep": "Tomas Lindqvist",
+    "territory": "EMEA",
+    "priority": "P1",
+    "sla_minutes": 15,
+    "propensity_score": 0.9727,
+    "intent": {
+      "intent": "demo_request",
+      "summary": "Attended the webinar last Thursday and wants a demo for her ops team of eight. Timeline is this quarter."
+    }
+  },
+  "lead_path": "/Users/robipowers/Downloads/leandata-revenue-engine-demo/data/inbound/lead_001.json"
+}
