@@ -177,7 +177,12 @@ def test_approve_resolves_pending(server):
     assert status == 200
     assert data["status"] == "assignment_applied"
     assert data.get("idempotent_replay") is True
-    assert data["records"] == []
+    # A replay writes NOTHING new; the records returned are the lead's real
+    # history from the append-only log, so the trace survives on screen.
+    stages = [r["stage"] for r in data["records"]]
+    assert stages[0] == "match"
+    assert stages[-1] == "assignment_applied"
+    assert all(r["lead_id"] == "L-1001" for r in data["records"])
 
 
 def test_corrupt_pending_maps_to_409(server, tmp_path):
@@ -289,3 +294,64 @@ def test_score_book_scores_every_account_with_the_real_model(server):
     _get(server, "/api/scores")
     _, after = _get(server, "/api/audit")
     assert before["total"] == after["total"]
+
+
+# ---------------------------------------------------------------------------
+# HITL hardening (2026-08 external audit), API surface
+# ---------------------------------------------------------------------------
+
+def test_normal_run_does_not_reset_rotation(server, tmp_path):
+    """Audit finding: every UI run passed fresh=true and silently reset
+    round-robin state. A default run must leave rotation alone."""
+    _post(server, "/api/run", {"lead": "lead_001", "fresh": True})
+    state_path = tmp_path / "routing_state.json"
+    assert state_path.exists()
+    before = state_path.read_text()
+    _post(server, "/api/run", {"lead": "lead_002"})  # no fresh flag
+    after = state_path.read_text()
+    # lead_002 advanced its own territory cursor; the point is the state
+    # file was NOT deleted/reset before the run.
+    assert json.loads(before).items() <= json.loads(after).items() or before != after
+    status, _ = _post(server, "/api/reset-rotation", {})
+    assert status == 200
+    assert not state_path.exists()
+
+
+def test_rerun_replays_pending_via_api(server):
+    s1, first = _post(server, "/api/run", {"lead": "lead_001"})
+    s2, second = _post(server, "/api/run", {"lead": "lead_001"})
+    assert (s1, s2) == (200, 200)
+    assert second.get("pending_replayed") is True
+    assert second["proposal"]["proposal_id"] == first["proposal"]["proposal_id"]
+    # The replay still renders a full trace and account context.
+    assert [r["stage"] for r in second["records"]][0] == "match"
+    assert second.get("account"), "replay must still carry account context"
+
+
+def test_stale_proposal_id_rejected_via_api(server):
+    _post(server, "/api/run", {"lead": "lead_001"})
+    status, data = _post(server, "/api/approve",
+                         {"lead": "lead_001", "decision": "approve",
+                          "proposal_id": "stale-id-123"})
+    assert status == 409
+    assert "stale" in data["error"] or "proposal" in data["error"]
+    # The correct id, as the UI sends it, approves.
+    _, current = _post(server, "/api/run", {"lead": "lead_001"})
+    status, data = _post(server, "/api/approve",
+                         {"lead": "lead_001", "decision": "approve",
+                          "proposal_id": current["proposal"]["proposal_id"]})
+    assert status == 200
+    assert data["status"] == "assignment_applied"
+
+
+def test_empty_proposal_pending_fails_closed_via_api(server, tmp_path):
+    """Audit finding: {'lead_id':...,'proposal':{}} was approved with null
+    routing fields. Through the API it must 409, never apply."""
+    _post(server, "/api/run", {"lead": "lead_001"})
+    pending = tmp_path / "pending" / "L-1001.json"
+    pending.write_text(json.dumps({"lead_id": "L-1001", "proposal": {}}))
+    status, data = _post(server, "/api/approve",
+                         {"lead": "lead_001", "decision": "approve"})
+    assert status == 409
+    stages = [r["stage"] for r in data.get("records", [])]
+    assert "assignment_applied" not in stages

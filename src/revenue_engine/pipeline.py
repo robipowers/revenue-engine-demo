@@ -20,7 +20,8 @@ import json
 import os
 import re
 import sys
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from revenue_engine import audit, config, model, routing, warehouse
@@ -45,11 +46,34 @@ LLM_TIMEOUT_SECONDS = 10.0
 
 PENDING_DIRNAME = "pending"
 RESOLVED_DIRNAME = "resolved"
+OUTBOX_DIRNAME = "outbox"
 
 # Lead fields that must be str or null when present (lead_id is required).
 _LEAD_STR_FIELDS = (
     "company", "domain", "notes", "country", "state", "contact_name", "email", "title",
 )
+
+# lead_id doubles as a filename under runs/{pending,resolved,outbox}/, so it
+# must be a bounded identifier — no separators, no traversal, no hidden files.
+_LEAD_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+
+# A routing proposal a human can approve must carry every field the human was
+# shown. Anything less is corrupt and fails closed at the approval gate.
+_PROPOSAL_REQUIRED_FIELDS: dict[str, type | tuple[type, ...]] = {
+    "proposal_id": str,
+    "lead_id": str,
+    "account_id": int,
+    "account_name": str,
+    "rep": str,
+    "territory": str,
+    "priority": str,
+    "sla_minutes": int,
+    "propensity_score": (int, float),
+}
+
+
+def _safe_lead_id(lead_id: str) -> bool:
+    return isinstance(lead_id, str) and bool(_LEAD_ID_RE.fullmatch(lead_id))
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +214,13 @@ def validate_lead(lead) -> None:
     lead_id = lead.get("lead_id")
     if not isinstance(lead_id, str) or not lead_id.strip():
         problems.append("lead_id (required, non-empty string)")
+    elif not _safe_lead_id(lead_id):
+        # lead_id becomes a filename under runs/ — a path-shaped id like
+        # "../escaped" must never reach the filesystem layer.
+        problems.append(
+            "lead_id (must match [A-Za-z0-9][A-Za-z0-9._-]{0,63}; "
+            "no slashes or other separators)"
+        )
     for field_name in _LEAD_STR_FIELDS:
         value = lead.get(field_name)
         if value is not None and not isinstance(value, str):
@@ -213,14 +244,44 @@ def _atomic_write_json(path: Path, payload: dict) -> None:
     os.replace(tmp, path)
 
 
-def _pending_path(lead_id: str, runs_dir: Path | str | None) -> Path:
+def _state_path(lead_id: str, dirname: str, runs_dir: Path | str | None) -> Path:
+    """Resolve runs/<dirname>/<lead_id>.json, refusing any lead_id that could
+    escape the directory. Both the identifier grammar and the resolved path
+    are checked — defense in depth, not one or the other."""
+    if not _safe_lead_id(lead_id):
+        raise ValueError(f"unsafe lead_id {lead_id!r}: not a valid identifier")
     base = Path(runs_dir) if runs_dir else config.RUNS_DIR
-    return base / PENDING_DIRNAME / f"{lead_id}.json"
+    directory = base / dirname
+    path = directory / f"{lead_id}.json"
+    if path.resolve().parent != directory.resolve():
+        raise ValueError(f"unsafe lead_id {lead_id!r}: escapes {dirname}/")
+    return path
+
+
+def _pending_path(lead_id: str, runs_dir: Path | str | None) -> Path:
+    return _state_path(lead_id, PENDING_DIRNAME, runs_dir)
 
 
 def _resolved_path(lead_id: str, runs_dir: Path | str | None) -> Path:
-    base = Path(runs_dir) if runs_dir else config.RUNS_DIR
-    return base / RESOLVED_DIRNAME / f"{lead_id}.json"
+    return _state_path(lead_id, RESOLVED_DIRNAME, runs_dir)
+
+
+def _outbox_path(lead_id: str, runs_dir: Path | str | None) -> Path:
+    return _state_path(lead_id, OUTBOX_DIRNAME, runs_dir)
+
+
+def _valid_proposal(proposal, lead_id: str) -> bool:
+    """A pending proposal is only approvable if it still carries every field
+    the human reviewed, with the right types, for the right lead."""
+    if not isinstance(proposal, dict):
+        return False
+    for field_name, expected in _PROPOSAL_REQUIRED_FIELDS.items():
+        value = proposal.get(field_name)
+        if not isinstance(value, expected) or isinstance(value, bool):
+            return False
+        if isinstance(value, str) and not value.strip():
+            return False
+    return proposal["lead_id"] == lead_id
 
 
 def _store_pending(lead_id: str, proposal: dict, runs_dir,
@@ -241,7 +302,7 @@ def _load_pending(lead_id: str, runs_dir) -> dict | None:
         pending = json.loads(path.read_text())
     except (json.JSONDecodeError, OSError):
         return None
-    if not isinstance(pending, dict) or not isinstance(pending.get("proposal"), dict):
+    if not isinstance(pending, dict) or not _valid_proposal(pending.get("proposal"), lead_id):
         return None
     return pending
 
@@ -278,15 +339,62 @@ def _load_resolved(lead_id: str, runs_dir) -> dict | None:
     return resolved
 
 
+def _write_outbox(lead_id: str, proposal: dict, runs_dir) -> str:
+    """The assignment side effect the HITL gate protects: an idempotent
+    outbox record a CRM adapter would consume. Written once per lead —
+    a replayed approve never rewrites it."""
+    path = _outbox_path(lead_id, runs_dir)
+    if not path.exists():
+        _atomic_write_json(path, {
+            "action": "apply_assignment",
+            "lead_id": lead_id,
+            "proposal_id": proposal.get("proposal_id"),
+            "rep": proposal.get("rep"),
+            "territory": proposal.get("territory"),
+            "priority": proposal.get("priority"),
+            "sla_minutes": proposal.get("sla_minutes"),
+            "applied_at": datetime.now(timezone.utc).isoformat(),
+        })
+    return f"runs/{OUTBOX_DIRNAME}/{lead_id}.json"
+
+
+def _check_proposal_id(lead_id: str, proposal: dict, proposal_id: str | None,
+                       runs_dir) -> None:
+    """Bind the decision to the exact proposal the human reviewed. A caller
+    that names a proposal_id must name the stored one; a mismatch means the
+    reviewed proposal was superseded — audited and rejected, never applied."""
+    if proposal_id is None:
+        return
+    stored = proposal.get("proposal_id")
+    if proposal_id != stored:
+        audit.append(
+            stage="stale_approval_rejected",
+            lead_id=lead_id,
+            inputs={"requested_proposal_id": proposal_id,
+                    "stored_proposal_id": stored},
+            decision={"reason": "proposal_id_mismatch"},
+            rule_fired="stale_approval",
+            runs_dir=runs_dir,
+        )
+        raise ValueError(
+            f"approval names proposal {proposal_id!r} but the stored proposal "
+            f"for lead {lead_id!r} is {stored!r} — the proposal you reviewed "
+            "no longer exists; re-open the lead, review the current proposal, "
+            "then decide (audited as stale_approval_rejected)"
+        )
+
+
 def _resolve_pending(lead_id: str, pending: dict, approve: bool,
-                     llm: bool, runs_dir) -> dict:
+                     llm: bool, runs_dir, proposal_id: str | None = None) -> dict:
     """Apply or reject the STORED pending proposal — never re-run the
     pipeline, never advance rotation state a second time."""
     proposal = pending["proposal"]
+    _check_proposal_id(lead_id, proposal, proposal_id, runs_dir)
     stages: list[dict] = []
     result: dict = {"lead_id": lead_id, "stages": stages, "llm": llm,
                     "proposal": proposal}
     if approve:
+        outbox = _write_outbox(lead_id, proposal, runs_dir)
         _record(
             stages,
             audit.append(
@@ -295,7 +403,9 @@ def _resolve_pending(lead_id: str, pending: dict, approve: bool,
                 inputs={"proposal": proposal},
                 decision={"rep": proposal.get("rep"),
                           "territory": proposal.get("territory"),
-                          "priority": proposal.get("priority")},
+                          "priority": proposal.get("priority"),
+                          "proposal_id": proposal.get("proposal_id"),
+                          "outbox": outbox},
                 rule_fired="human_approved",
                 runs_dir=runs_dir,
             ),
@@ -330,7 +440,7 @@ def _extract_lead_id(lead_path: Path | str) -> str | None:
     if not isinstance(lead, dict):
         return None
     lead_id = lead.get("lead_id")
-    if isinstance(lead_id, str) and lead_id.strip():
+    if isinstance(lead_id, str) and _safe_lead_id(lead_id):
         return lead_id
     return None
 
@@ -353,7 +463,8 @@ def _find_pending_lead_id_by_path(lead_path: Path | str, runs_dir) -> str | None
     return None
 
 
-def _resolve_from_state(lead_id: str, approve: bool, llm: bool, runs_dir) -> dict | None:
+def _resolve_from_state(lead_id: str, approve: bool, llm: bool, runs_dir,
+                        proposal_id: str | None = None) -> dict | None:
     """Approve/reject state machine, consulted BEFORE any pipeline re-run.
 
     Returns a result dict when the stored state fully answers the request,
@@ -365,7 +476,8 @@ def _resolve_from_state(lead_id: str, approve: bool, llm: bool, runs_dir) -> dic
     if pending_file.exists():
         pending = _load_pending(lead_id, runs_dir)
         if pending is not None:
-            return _resolve_pending(lead_id, pending, approve, llm, runs_dir)
+            return _resolve_pending(lead_id, pending, approve, llm, runs_dir,
+                                    proposal_id=proposal_id)
         # Corrupt/invalid pending: audited discard + hard stop, never a
         # silent re-run that would apply a proposal no human ever saw.
         audit.append(
@@ -387,7 +499,9 @@ def _resolve_from_state(lead_id: str, approve: bool, llm: bool, runs_dir) -> dic
     if resolved is not None:
         # Idempotent replay: the disposition already happened. Return the
         # recorded outcome unchanged — no new audit decision, no pipeline
-        # re-run, no rotation advance.
+        # re-run, no rotation advance. A named proposal_id must still match
+        # the proposal that was actually resolved.
+        _check_proposal_id(lead_id, resolved["proposal"], proposal_id, runs_dir)
         return {
             "lead_id": lead_id,
             "stages": [],
@@ -439,14 +553,23 @@ def run(
     db_path: Path | str | None = None,
     model_path: Path | str | None = None,
     as_of: datetime | None = None,
+    proposal_id: str | None = None,
+    renew: bool = False,
 ) -> dict:
     """Run the full pipeline for one inbound lead JSON file.
 
     approve: None -> stop at the HITL gate (pending_approval) and persist
-             the proposal to runs/pending/<lead_id>.json;
+             the proposal to runs/pending/<lead_id>.json; when a valid
+             pending proposal already exists it is RETURNED, not re-computed
+             — a preview can never silently overwrite what a human is
+             reviewing. Pass renew=True to explicitly supersede it (audited).
              True -> apply the assignment (a stored pending proposal, when
              one exists, is applied as-is without re-running the pipeline);
              False -> route to human review (likewise consumes any pending).
+    proposal_id: when set on an approve/reject, the stored proposal must
+             carry exactly this id — a mismatch fails closed (audited as
+             stale_approval_rejected) instead of applying a proposal the
+             human never reviewed.
     as_of: scoring clock; defaults to warehouse.demo_as_of() — the frozen
            dataset gets a frozen clock, so scores stay meaningful on any
            demo day instead of decaying with the real calendar.
@@ -463,13 +586,58 @@ def run(
             # proposal (which remembers its lead_path) is still approvable.
             lead_id = _find_pending_lead_id_by_path(lead_path, runs_dir)
         if lead_id is not None:
-            resolution = _resolve_from_state(lead_id, approve, llm, runs_dir)
+            resolution = _resolve_from_state(lead_id, approve, llm, runs_dir,
+                                             proposal_id=proposal_id)
             if resolution is not None:
                 return resolution
 
-    lead = json.loads(Path(lead_path).read_text())
-    validate_lead(lead)
+    # Reading, parsing and validating the lead sit INSIDE the audited
+    # failure boundary: a malformed payload leaves a pipeline_error record,
+    # never a silent exit. Until a lead_id is parsed, the file stem is the
+    # best identifier available for the record.
+    lead_id_hint = Path(lead_path).stem
+    try:
+        lead = json.loads(Path(lead_path).read_text())
+        validate_lead(lead)
+    except Exception as exc:
+        audit.append(
+            stage="pipeline_error",
+            lead_id=lead_id_hint,
+            inputs={"lead_path": str(lead_path)},
+            decision={"error": type(exc).__name__, "message": str(exc),
+                      "last_stage": None},
+            rule_fired="pipeline_exception",
+            runs_dir=runs_dir,
+        )
+        raise
     lead_id = lead["lead_id"]
+
+    # Immutable review contract: while a valid pending proposal exists, a
+    # plain preview run returns THAT proposal instead of computing a new
+    # one. Only an explicit renew supersedes it, and the supersede itself
+    # is audited before the old proposal is discarded.
+    if approve is None:
+        existing = _load_pending(lead_id, runs_dir)
+        if existing is not None:
+            if not renew:
+                return {
+                    "lead_id": lead_id,
+                    "stages": [],
+                    "llm": llm,
+                    "proposal": existing["proposal"],
+                    "status": "pending_approval",
+                    "pending_replayed": True,
+                }
+            audit.append(
+                stage="pending_superseded",
+                lead_id=lead_id,
+                inputs={"superseded_proposal_id":
+                        existing["proposal"].get("proposal_id")},
+                decision={"reason": "explicit_renew"},
+                rule_fired="pending_superseded",
+                runs_dir=runs_dir,
+            )
+            _clear_pending(lead_id, runs_dir)
 
     stages: list[dict] = []
     result: dict = {"lead_id": lead_id, "stages": stages, "llm": llm}
@@ -672,6 +840,7 @@ def _execute(
 
     # ---- HITL gate ---------------------------------------------------------
     proposal = {
+        "proposal_id": uuid.uuid4().hex[:12],
         "lead_id": lead_id,
         "account_id": account_id,
         "account_name": account_name,
@@ -696,6 +865,7 @@ def _execute(
     )
 
     if approve is True:
+        outbox = _write_outbox(lead_id, proposal, runs_dir)
         _record(
             stages,
             audit.append(
@@ -703,7 +873,9 @@ def _execute(
                 lead_id=lead_id,
                 inputs={"proposal": proposal},
                 decision={"rep": decision.rep, "territory": decision.territory,
-                          "priority": decision.priority},
+                          "priority": decision.priority,
+                          "proposal_id": proposal["proposal_id"],
+                          "outbox": outbox},
                 rule_fired="human_approved",
                 runs_dir=runs_dir,
             ),

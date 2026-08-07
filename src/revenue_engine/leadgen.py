@@ -325,7 +325,7 @@ def reset_demo(runs_dir=None) -> str:
         src = root / name
         if src.exists():
             src.rename(archive / f"{name}.{stamp}")
-    for name in ("pending", "resolved"):
+    for name in ("pending", "resolved", "outbox"):
         src = root / name
         if src.is_dir():
             src.rename(archive / f"{name}.{stamp}")

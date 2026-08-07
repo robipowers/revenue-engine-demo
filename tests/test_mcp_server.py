@@ -50,18 +50,39 @@ def test_exactly_three_tools_registered():
 
 def test_lookup_account_domain_exact():
     out = mcp_server.lookup_account("meterhouse.io")
-    assert out["match_type"] == "domain_exact"
-    assert out["account"]["name"] == "Meterhouse"
-    assert out["account"]["territory"] == "EMEA"
+    assert out["status"] == "matched"
+    assert out["method"] == "domain_exact"
+    assert out["account_name"] == "Meterhouse"
+    assert out["score"] == 100.0
+
+
+def test_lookup_account_matches_pipeline_matcher_exactly():
+    """The MCP tool and the pipeline matcher are the SAME code path: same
+    status, same score, same candidate list for the same query."""
+    from revenue_engine import warehouse
+    from revenue_engine.matching import match_account
+
+    for query in ("Hine Metric Co", "Zephyr Robotics", "meterhouse.io"):
+        con = warehouse.connect()
+        try:
+            expected = match_account(con, name=query, domain=query)
+        finally:
+            con.close()
+        out = mcp_server.lookup_account(query)
+        assert out["status"] == expected.status
+        assert out["score"] == expected.score
+        assert out["candidates"] == expected.candidates[:mcp_server.MAX_CANDIDATES]
 
 
 def test_lookup_account_fuzzy_returns_ranked_candidates():
     out = _call("lookup_account", {"query": "Hine Metric Co"})
-    assert out["match_type"] == "fuzzy_name"
+    assert out["status"] == "ambiguous"
+    assert out["method"] == "fuzzy_name"
     candidates = out["candidates"]
     assert len(candidates) >= 2
     for cand in candidates:
         assert set(cand) == {"account_id", "name", "score"}
+        assert cand["score"] >= 70.0  # only the ambiguous band, like the pipeline
     scores = [c["score"] for c in candidates]
     assert scores == sorted(scores, reverse=True), "candidates must be ranked"
     assert candidates[0]["name"] == "Hivemetric"  # same scoring as matching.py
@@ -71,8 +92,11 @@ def test_lookup_account_fuzzy_returns_ranked_candidates():
 
 def test_lookup_account_no_plausible_match_still_structured():
     out = mcp_server.lookup_account("Zephyr Robotics")
-    assert out["match_type"] == "fuzzy_name"
-    assert all(c["score"] < 90.0 for c in out["candidates"])
+    assert out["status"] == "no_match"
+    # Below the ambiguous threshold means NO candidates — exactly what the
+    # pipeline would decide for the same query, not a looser contract.
+    assert out["candidates"] == []
+    assert out["score"] is not None and out["score"] < 70.0
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +105,7 @@ def test_lookup_account_no_plausible_match_still_structured():
 
 def test_account_context_documented_shape():
     lookup = mcp_server.lookup_account("meterhouse.io")
-    account_id = lookup["account"]["id"]
+    account_id = lookup["account_id"]
     out = _call("account_context", {"account_id": account_id})
     assert set(out) >= {
         "account", "contacts", "recent_activities", "open_opportunities",
@@ -93,6 +117,17 @@ def test_account_context_documented_shape():
     assert 0.0 <= out["propensity_score"] <= 1.0
     for opp in out["open_opportunities"]:
         assert opp["outcome"] is None
+    # The activity feed is cut at the same clock the score was computed at:
+    # nothing shown beside the score postdates it.
+    from datetime import datetime as _dt
+
+    from revenue_engine import warehouse
+    clock = warehouse.demo_as_of()
+    for act in out["recent_activities"]:
+        ts = act["ts"]
+        if isinstance(ts, str):  # MCP dispatch serializes timestamps
+            ts = _dt.fromisoformat(ts)
+        assert ts <= clock
 
 
 def test_account_context_invalid_id_structured_error():
@@ -144,7 +179,7 @@ def test_tools_missing_warehouse_return_structured_error(tmp_path, monkeypatch):
 def test_account_context_missing_model_returns_structured_error(monkeypatch):
     from revenue_engine import model
 
-    account_id = mcp_server.lookup_account("meterhouse.io")["account"]["id"]
+    account_id = mcp_server.lookup_account("meterhouse.io")["account_id"]
     monkeypatch.setattr(mcp_server, "_MODEL_CACHE", {})
 
     def _missing(*args, **kwargs):

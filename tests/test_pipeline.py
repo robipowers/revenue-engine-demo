@@ -121,7 +121,11 @@ def test_two_fresh_runs_identical(tmp_path):
     # the idempotency test below and replays instead of re-running.)
     first = pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path / "a")
     second = pipeline.run(LEAD_MESSY, approve=True, runs_dir=tmp_path / "b")
-    assert first["proposal"] == second["proposal"]
+    # proposal_id is the one deliberately unique field (each generated
+    # proposal has its own identity); everything decided must be identical.
+    strip = lambda p: {k: v for k, v in p.items() if k != "proposal_id"}
+    assert strip(first["proposal"]) == strip(second["proposal"])
+    assert first["proposal"]["proposal_id"] != second["proposal"]["proposal_id"]
     assert first["score"] == second["score"]
 
 
@@ -282,8 +286,11 @@ def test_lead_wrong_typed_fields_rejected_with_clear_error(tmp_path):
     assert "invalid lead" in message
     assert "company" in message
     assert "notes" in message
-    # Validation happens before any stage: zero audit records written.
-    assert _audit_records(tmp_path) == []
+    # A malformed lead is still an audited failure: exactly one terminal
+    # pipeline_error record, no stage records before it.
+    records = _audit_records(tmp_path)
+    assert [r["stage"] for r in records] == ["pipeline_error"]
+    assert records[0]["decision"]["error"] == "ValueError"
 
 
 def test_mid_pipeline_failure_writes_terminal_error_record(tmp_path):
@@ -569,3 +576,134 @@ def test_pipeline_runs_from_foreign_cwd(tmp_path):
     )
     assert proc.returncode == 0, f"stdout={proc.stdout}\nstderr={proc.stderr}"
     assert "ok" in proc.stdout
+
+
+# ---------------------------------------------------------------------------
+# HITL hardening (2026-08 external audit): proposal identity, immutability,
+# schema-validated approval, path-safe lead ids, audited approve side effect
+# ---------------------------------------------------------------------------
+
+def test_traversal_lead_id_rejected_and_writes_nothing_outside(tmp_path):
+    """Audit finding: lead_id '../escaped' wrote runs/escaped.json."""
+    runs = tmp_path / "runs"
+    path = _write_lead(tmp_path, {
+        "lead_id": "../escaped", "company": "Meterhouse",
+        "domain": "meterhouse.io", "country": "Germany", "notes": "hi",
+    })
+    with pytest.raises(ValueError, match="lead_id"):
+        pipeline.run(path, runs_dir=runs)
+    assert not (runs / "escaped.json").exists()
+    assert not (tmp_path / "escaped.json").exists()
+    assert not (runs / "pending").exists()
+
+
+def test_state_paths_refuse_unsafe_lead_id(tmp_path):
+    for bad in ("../x", "a/b", "a\\b", ".hidden", ""):
+        with pytest.raises(ValueError, match="unsafe lead_id"):
+            pipeline._pending_path(bad, tmp_path)
+
+
+def test_proposal_carries_identity(tmp_path):
+    result = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)
+    pid = result["proposal"]["proposal_id"]
+    assert isinstance(pid, str) and len(pid) == 12
+    stored = json.loads((tmp_path / "pending" / "L-1001.json").read_text())
+    assert stored["proposal"]["proposal_id"] == pid
+
+
+def test_rerun_replays_pending_instead_of_overwriting(tmp_path):
+    """Audit finding: a second preview overwrote the proposal a human was
+    reviewing. Now the stored pending proposal is returned unchanged."""
+    first = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)
+    before = len(_audit_records(tmp_path))
+    second = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)
+    assert second.get("pending_replayed") is True
+    assert second["proposal"] == first["proposal"]
+    assert len(_audit_records(tmp_path)) == before, "replay writes no records"
+    approved = pipeline.run(LEAD_CLEAN, approve=True, runs_dir=tmp_path)
+    assert approved["proposal"]["proposal_id"] == first["proposal"]["proposal_id"]
+
+
+def test_renew_supersedes_pending_with_audit_record(tmp_path):
+    first = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)
+    renewed = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path, renew=True)
+    assert renewed.get("pending_replayed") is None
+    assert renewed["proposal"]["proposal_id"] != first["proposal"]["proposal_id"]
+    superseded = [r for r in _audit_records(tmp_path)
+                  if r["stage"] == "pending_superseded"]
+    assert len(superseded) == 1
+    assert superseded[0]["inputs"]["superseded_proposal_id"] == \
+        first["proposal"]["proposal_id"]
+
+
+def test_stale_proposal_id_fails_closed(tmp_path):
+    """Audit kill-shot: approval must be bound to the reviewed proposal."""
+    result = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)
+    with pytest.raises(ValueError, match="stale_approval_rejected"):
+        pipeline.run(LEAD_CLEAN, approve=True, runs_dir=tmp_path,
+                     proposal_id="not-the-real-one")
+    # Nothing applied, pending untouched, the rejection itself is audited.
+    assert "assignment_applied" not in _stages(tmp_path)
+    assert _stages(tmp_path)[-1] == "stale_approval_rejected"
+    assert (tmp_path / "pending" / "L-1001.json").exists()
+    # The CORRECT id still approves.
+    ok = pipeline.run(LEAD_CLEAN, approve=True, runs_dir=tmp_path,
+                      proposal_id=result["proposal"]["proposal_id"])
+    assert ok["status"] == "assignment_applied"
+
+
+def test_structurally_corrupt_pending_fails_closed(tmp_path):
+    """Audit finding: {'lead_id':..., 'proposal':{}} was approved with null
+    routing fields. An incomplete proposal must never be applied."""
+    pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)
+    pending = tmp_path / "pending" / "L-1001.json"
+    pending.write_text(json.dumps({"lead_id": "L-1001", "proposal": {}}))
+    with pytest.raises(ValueError, match="corrupt"):
+        pipeline.run(LEAD_CLEAN, approve=True, runs_dir=tmp_path)
+    assert "assignment_applied" not in _stages(tmp_path)
+    assert "pending_discarded" in _stages(tmp_path)
+
+
+def test_pending_missing_one_required_field_is_corrupt(tmp_path):
+    pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)
+    pending_path = tmp_path / "pending" / "L-1001.json"
+    stored = json.loads(pending_path.read_text())
+    del stored["proposal"]["rep"]
+    pending_path.write_text(json.dumps(stored))
+    with pytest.raises(ValueError, match="corrupt"):
+        pipeline.run(LEAD_CLEAN, approve=True, runs_dir=tmp_path)
+    assert "assignment_applied" not in _stages(tmp_path)
+
+
+def test_approve_writes_idempotent_outbox_record(tmp_path):
+    """Audit finding: 'assignment_applied' had no side effect. The approve
+    now writes the outbox record a CRM adapter would consume, exactly once."""
+    result = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)
+    pipeline.run(LEAD_CLEAN, approve=True, runs_dir=tmp_path)
+    outbox = tmp_path / "outbox" / "L-1001.json"
+    assert outbox.exists()
+    record = json.loads(outbox.read_text())
+    assert record["action"] == "apply_assignment"
+    assert record["proposal_id"] == result["proposal"]["proposal_id"]
+    assert record["rep"] == result["proposal"]["rep"]
+    first_bytes = outbox.read_bytes()
+    pipeline.run(LEAD_CLEAN, approve=True, runs_dir=tmp_path)  # replay
+    assert outbox.read_bytes() == first_bytes, "replay never rewrites outbox"
+
+
+def test_reject_writes_no_outbox(tmp_path):
+    pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)
+    pipeline.run(LEAD_CLEAN, approve=False, runs_dir=tmp_path)
+    assert not (tmp_path / "outbox" / "L-1001.json").exists()
+
+
+def test_unparseable_lead_writes_pipeline_error_record(tmp_path):
+    """Audit finding: parse/validation failures escaped the audited
+    boundary. Now every failure leaves a terminal record."""
+    path = tmp_path / "broken.json"
+    path.write_text("{not json")
+    with pytest.raises(json.JSONDecodeError):
+        pipeline.run(path, runs_dir=tmp_path)
+    records = _audit_records(tmp_path)
+    assert [r["stage"] for r in records] == ["pipeline_error"]
+    assert records[0]["lead_id"] == "broken"  # file stem: best id available

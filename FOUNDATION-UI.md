@@ -258,3 +258,18 @@ Note that each `?demo=` open appends a fresh run, so reseed before final capture
 condition that routed the record down that path (`Match`, `No`, `P1 · score ≥ 0.7`,
 `Round Robin again`). Result cards hang off **dashed** connectors with no label.
 `Next` is not a label. This convention must read identically across both leads.
+
+**One terminal-status contract, spelled exactly.** The API's terminal statuses
+are `assignment_applied` and `routed_to_review` — the same strings as the audit
+stages. The UI once checked `applied`/`rejected`, which matched nothing the
+server ever sent, so a rejection rendered as still-pending. Status strings are
+compared against what the server actually returns, never a paraphrase.
+
+**Never replace the records array after a decision.** The approve/reject
+response carries only the terminal record; `Object.assign` over `S.run` erased
+the match-to-route trace on screen. Append the new records to the existing
+trace instead.
+
+**Runs never reset rotation.** Every UI run posts `fresh:false`; resetting
+round-robin state is its own labelled control (Round Robin › Reset demo
+rotation) and an explicit `/api/reset-rotation` call — never a side effect.

@@ -313,8 +313,10 @@ tfoot .fagg b{color:var(--ink-2);font-weight:600}
 .nd.ghost .nd-t{font-weight:500}
 
 /* ---------- waterfall ---------- */
-.wf{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--line)}
-.wf-h,.wf-r{display:grid;grid-template-columns:28px minmax(112px,.9fr) 196px 128px minmax(150px,1.6fr);gap:1px}
+/* overflow-x:auto + a min-width on rows: at narrow widths the grid scrolls
+   inside its own container instead of clipping the Source/Result columns. */
+.wf{border:1px solid var(--line);border-radius:8px;overflow-x:auto;overflow-y:hidden;background:var(--line)}
+.wf-h,.wf-r{display:grid;grid-template-columns:28px minmax(112px,.9fr) 196px 128px minmax(150px,1.6fr);gap:1px;min-width:640px}
 .wf-h{margin-bottom:1px}
 .wf-r{margin-bottom:1px}
 .wf-r:last-child{margin-bottom:0}
@@ -577,6 +579,9 @@ const AUD_PAIR = {
   match:PAIR.ok, tie_break:PAIR.warn, enrich:PAIR.cool, intent_summary:PAIR.warn,
   score:PAIR.brand, routing:PAIR.brand, routing_skip:PAIR.bad,
   pending_approval:PAIR.warn, assignment_applied:PAIR.ok, rejected:PAIR.bad,
+  routed_to_review:PAIR.bad, pending_superseded:PAIR.bad,
+  stale_approval_rejected:PAIR.bad, pipeline_error:PAIR.bad,
+  new_account:PAIR.cool, llm_unavailable:PAIR.mute,
   pending_discarded:PAIR.bad, routing_state_reset:PAIR.mute,
 };
 function sq(name, cls){
@@ -602,18 +607,22 @@ async function boot(){
   renderNav();
 
   const demo = new URLSearchParams(location.search).get('demo');
-  if(demo){ await runLead(demo, true); }
+  if(demo){ await runLead(demo); }
   else { route(); }
 }
 async function refreshLive(){
   const [stats,aud,desk] = await Promise.all([getJSON('/api/stats'),getJSON('/api/audit'),getJSON('/api/desk')]);
   S.stats=stats; S.audit=aud; S.desk=desk; renderNav();
 }
-async function runLead(token, fresh){
+/* Normal runs NEVER reset round-robin state: rotation only moves the way it
+   would in production, and resetting it is its own labelled control. When a
+   pending proposal exists the server replays it unchanged (immutable review
+   contract) instead of computing a new one. */
+async function runLead(token){
   if(S.busy) return; S.busy=true;
   try{
     const r = await getJSON('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({lead:token, fresh:!!fresh})});
+      body:JSON.stringify({lead:token, fresh:false})});
     if(r && r.error){ S.busy=false; return; }
     S.run=r; S.runLead=token; S.tab='overview';
     await refreshLive();
@@ -621,14 +630,30 @@ async function runLead(token, fresh){
     route();
   } finally { S.busy=false; }
 }
+/* The decision names the exact proposal_id the human is looking at — the
+   server rejects the request (409, audited) if the stored proposal differs. */
 async function decide(decision){
   if(S.busy||!S.runLead) return; S.busy=true;
   try{
+    const pid = S.run && S.run.proposal ? S.run.proposal.proposal_id : null;
     const r = await getJSON('/api/approve',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({lead:S.runLead, decision})});
-    if(r && !r.error) S.run = Object.assign({}, S.run, r);
+      body:JSON.stringify({lead:S.runLead, decision, proposal_id:pid})});
+    if(r && !r.error){
+      /* Append the terminal record to the existing trace — replacing the
+         records array would erase the match-to-route evidence on screen. */
+      const merged = (S.run && S.run.records ? S.run.records : []).concat(r.records||[]);
+      S.run = Object.assign({}, S.run, r, {records:merged});
+    }
     await refreshLive();
     route();
+  } finally { S.busy=false; }
+}
+async function resetRotation(){
+  if(S.busy) return; S.busy=true;
+  try{
+    await getJSON('/api/reset-rotation',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:'{}'});
+    await refreshLive(); route();
   } finally { S.busy=false; }
 }
 
@@ -874,7 +899,7 @@ function vOverview(v){
   topbar('Routing Overview',
     `${num(S.audit.total)} decisions recorded live · features frozen at the scoring clock ${fmtTime(st.as_of)}`,
     [{label:'Export audit', icon:'i-dl', on:exportAudit},
-     {label:'Run next lead', icon:'i-play', primary:true, on:()=>S.leads.length&&runLead(S.leads[0].file, true)}]);
+     {label:'Run next lead', icon:'i-play', primary:true, on:()=>S.leads.length&&runLead(S.leads[0].file)}]);
 
   v.innerHTML = '';
   const strip = el('div','strip');
@@ -928,7 +953,7 @@ function vOverview(v){
       <div class="qcta">${ico('i-play')}<span>${o.status?'Re-run routing':'Run routing'}</span>
         ${o.status?`<span style="margin-left:auto;font-weight:500">${chip(o.status.toUpperCase(), OUT_PAIR[o.status])}
           ${o.rep?`<span style="color:var(--ink-3)"> ${esc(o.rep)}</span>`:''}</span>`:''}</div>`;
-    c.onclick = ()=>runLead(ld.file, true);
+    c.onclick = ()=>runLead(ld.file);
     qw.appendChild(c);
   });
   const rest = (waiting.length ? waiting.length : S.leads.length) - shown.length;
@@ -1243,7 +1268,7 @@ function vQueue(v){
   h.innerHTML = `<h2>Inbound</h2><div class="sp"></div><span class="pmeta">click a row to route it through the engine</span>`;
   v.appendChild(h);
   const host = el('div'); v.appendChild(host);
-  renderTable(host,'queue',cols,S.leads,{unit:'leads', sortKey:'lead_id', onRow:r=>runLead(r.file,true)});
+  renderTable(host,'queue',cols,S.leads,{unit:'leads', sortKey:'lead_id', onRow:r=>runLead(r.file)});
 
   /* Where the NEXT lead lands is a real, inspectable fact: the rotation
      cursor on disk plus each rep's availability. */
@@ -1343,7 +1368,8 @@ function repLeads(name){
   return out;
 }
 function vRoundRobin(v){
-  topbar('Round Robin', `rotation cursors from runs/routing_state.json · ${S.stats.reps} reps across ${S.stats.territories} territories`, []);
+  topbar('Round Robin', `rotation cursors from runs/routing_state.json · ${S.stats.reps} reps across ${S.stats.territories} territories`,
+    [{label:'Reset demo rotation', icon:'i-rr', on:resetRotation}]);
   v.innerHTML='';
   const rot = S.desk.rotation||{};
   const roster = repRoster();
@@ -1570,8 +1596,12 @@ function vLead(v, token){
         sS=stg('score'), kS=stg('routing_skip'), rS=stg('routing');
   const pa = stg('pending_approval');
   const prop = run.proposal || (pa && pa.decision ? pa.decision.proposal : null);
-  const applied = run.status==='applied' || !!stg('assignment_applied');
-  const rejected = run.status==='rejected' || !!stg('rejected');
+  /* ONE terminal-status contract, matching what the API actually returns:
+     status 'assignment_applied' | 'routed_to_review', or the same stage
+     names in the trace. (The old 'applied'/'rejected' checks matched
+     nothing the server ever sent, so a rejection rendered as pending.) */
+  const applied = run.status==='assignment_applied' || !!stg('assignment_applied');
+  const rejected = run.status==='routed_to_review' || !!stg('routed_to_review');
   run._trace = trace;
 
   topbar('Routing Queue › '+run.lead_id,
@@ -1713,7 +1743,7 @@ function vLead(v, token){
   rec.appendChild(body);
   v.appendChild(rec);
 
-  $('#btnRerun').onclick = ()=>runLead(S.runLead, true);
+  $('#btnRerun').onclick = ()=>runLead(S.runLead);
   $('#btnAud').onclick   = ()=>{ S.tab='records'; route(); };
   if(S.tab==='overview') drawEdges();
 }

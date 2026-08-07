@@ -1,3 +1,6 @@
 {
-  "EMEA": 0
+  "AMER-East": 1,
+  "AMER-West": 0,
+  "EMEA": 0,
+  "APAC": 0
 }

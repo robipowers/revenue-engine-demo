@@ -25,14 +25,13 @@ from typing import Any
 
 import duckdb
 from mcp.server.mcpserver import MCPServer
-from rapidfuzz import fuzz
 
 from revenue_engine import config, model, routing, warehouse
 from revenue_engine.features import features_as_of
 from revenue_engine.matching import (
     AMBIGUOUS_THRESHOLD,
     AUTO_MATCH_THRESHOLD,
-    normalize_name,
+    match_account,
 )
 
 MAX_CANDIDATES = 5
@@ -80,9 +79,10 @@ def _model_payload() -> dict:
 def lookup_account(query: str) -> dict[str, Any]:
     """Resolve a company domain or name to a warehouse account.
 
-    A domain match returns the full account record; otherwise returns
-    fuzzy-name candidates ranked by the same rapidfuzz scoring the
-    pipeline's matcher uses, with the matcher's thresholds attached.
+    Calls the SAME matcher the pipeline uses (matching.match_account), so
+    the status, score and candidate policy here are exactly what a lead
+    with this company/domain would get: matched | ambiguous | no_match,
+    with candidates only inside the ambiguous band.
     Missing data artifacts return a structured error dict, never a traceback.
     """
     try:
@@ -90,29 +90,22 @@ def lookup_account(query: str) -> dict[str, Any]:
     except _ARTIFACT_ERRORS as exc:
         return _artifacts_error(exc)
     try:
-        account = warehouse.get_account_by_domain(con, query)
-        if account:
-            return {"match_type": "domain_exact", "query": query, "account": account}
-
-        normalized = normalize_name(query)
-        scored = [
-            {
-                "account_id": acct["id"],
-                "name": acct["name"],
-                "score": round(fuzz.token_set_ratio(normalized, normalize_name(acct["name"])), 1),
-            }
-            for acct in warehouse.search_accounts_by_name(con)
-        ]
-        scored.sort(key=lambda c: (-c["score"], c["account_id"]))
-        return {
-            "match_type": "fuzzy_name",
+        match = match_account(con, name=query, domain=query)
+        payload: dict[str, Any] = {
             "query": query,
-            "candidates": scored[:MAX_CANDIDATES],
+            "status": match.status,
+            "method": match.method,
+            "score": match.score,
+            "candidates": match.candidates[:MAX_CANDIDATES],
             "policy": {
                 "auto_match_threshold": AUTO_MATCH_THRESHOLD,
                 "ambiguous_threshold": AMBIGUOUS_THRESHOLD,
             },
         }
+        if match.status == "matched":
+            payload["account_id"] = match.account_id
+            payload["account_name"] = match.account_name
+        return payload
     except _ARTIFACT_ERRORS as exc:
         return _artifacts_error(exc)
     finally:
@@ -141,10 +134,22 @@ def account_context(account_id: int) -> dict[str, Any]:
             }
         as_of = warehouse.demo_as_of()
         propensity = model.score(features_as_of(con, account_id, as_of), _model_payload())
+        # Activities are cut at the same as-of clock the score was computed
+        # at — the context shown beside a score never contains events the
+        # score could not have seen.
+        recent = [
+            {"id": r[0], "contact_id": r[1], "type": r[2], "ts": r[3]}
+            for r in con.execute(
+                "SELECT id, contact_id, type, ts FROM activities "
+                "WHERE account_id = ? AND ts <= CAST(? AS TIMESTAMP) "
+                "ORDER BY ts DESC LIMIT ?",
+                [account_id, as_of, MAX_ACTIVITIES],
+            ).fetchall()
+        ]
         return {
             "account": context["account"],
             "contacts": context["contacts"],
-            "recent_activities": context["recent_activities"][:MAX_ACTIVITIES],
+            "recent_activities": recent,
             "open_opportunities": context["open_opportunities"],
             "propensity_score": round(propensity, 4),
             "as_of": as_of.isoformat(),

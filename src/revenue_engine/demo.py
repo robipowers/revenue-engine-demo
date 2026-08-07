@@ -74,6 +74,10 @@ def main() -> None:
     parser.add_argument("--reject", action="store_true", help="reject the proposal to human review")
     parser.add_argument("--fresh", action="store_true",
                         help="reset round-robin rotation state (audit log is never touched)")
+    parser.add_argument("--renew", action="store_true",
+                        help="explicitly supersede an existing pending proposal "
+                             "(audited); without this, a re-run returns the "
+                             "stored pending proposal unchanged")
     args = parser.parse_args()
 
     if args.approve and args.reject:
@@ -85,13 +89,17 @@ def main() -> None:
 
     approve = True if args.approve else False if args.reject else None
     try:
-        result = pipeline.run(args.lead, llm=args.llm, approve=approve)
+        result = pipeline.run(args.lead, llm=args.llm, approve=approve,
+                              renew=args.renew)
     except ValueError as exc:
         raise SystemExit(f"error: {exc}") from exc
 
     if result.get("idempotent_replay"):
         print(f"(already resolved as {result['status']}; replaying the "
               "recorded outcome, nothing re-run)\n")
+    if result.get("pending_replayed"):
+        print("(a pending proposal already exists; showing it unchanged — "
+              "approve/reject it, or pass --renew to supersede it)\n")
     _print_stages(result)
     _print_proposal(result)
     _print_audit_tail()

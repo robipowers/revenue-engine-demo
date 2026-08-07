@@ -427,6 +427,18 @@ def _audit_lines(runs_dir) -> list[str]:
     return [line for line in path.read_text().splitlines() if line.strip()]
 
 
+def _lead_history(lead_id: str, runs_dir) -> list[dict]:
+    """One lead's most recent full trace from the audit log: its records
+    from the last match stage (the start of its latest pipeline pass)
+    through the end of the log. Used when a replayed run wrote no delta."""
+    records = [r for r in _parse_records(_audit_lines(runs_dir))
+               if r.get("lead_id") == lead_id]
+    for i in range(len(records) - 1, -1, -1):
+        if records[i].get("stage") == "match":
+            return records[i:]
+    return records
+
+
 def _parse_records(lines: list[str]) -> list[dict]:
     records = []
     for line in lines:
@@ -567,13 +579,24 @@ class RelayHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": "expected a JSON object body"})
             return
         if path == "/api/run":
-            self._handle_run(body, approve=None, fresh=bool(body.get("fresh")))
+            self._handle_run(body, approve=None, fresh=bool(body.get("fresh")),
+                             renew=bool(body.get("renew")))
         elif path == "/api/approve":
             decision = body.get("decision")
             if decision not in ("approve", "reject"):
                 self._send_json(400, {"error": 'decision must be "approve" or "reject"'})
                 return
-            self._handle_run(body, approve=(decision == "approve"), fresh=False)
+            proposal_id = body.get("proposal_id")
+            if proposal_id is not None and not isinstance(proposal_id, str):
+                self._send_json(400, {"error": "proposal_id must be a string"})
+                return
+            self._handle_run(body, approve=(decision == "approve"), fresh=False,
+                             proposal_id=proposal_id)
+        elif path == "/api/reset-rotation":
+            # The ONLY way the UI resets round-robin state: an explicit,
+            # labelled control — never a side effect of running a lead.
+            routing.reset_state(self.runs_dir)
+            self._send_json(200, {"reset": True})
         else:
             self._send_json(404, {"error": f"not found: {path}"})
 
@@ -592,7 +615,8 @@ class RelayHandler(BaseHTTPRequestHandler):
 
     # -- pipeline calls -----------------------------------------------------
 
-    def _handle_run(self, body: dict, approve: bool | None, fresh: bool) -> None:
+    def _handle_run(self, body: dict, approve: bool | None, fresh: bool,
+                    renew: bool = False, proposal_id: str | None = None) -> None:
         lead_path = resolve_lead_path(body.get("lead"))
         if lead_path is None:
             self._send_json(404, {"error": f"unknown lead: {body.get('lead')!r}"})
@@ -601,7 +625,8 @@ class RelayHandler(BaseHTTPRequestHandler):
             routing.reset_state(self.runs_dir)
         before = len(_audit_lines(self.runs_dir))
         try:
-            result = pipeline.run(lead_path, approve=approve, runs_dir=self.runs_dir)
+            result = pipeline.run(lead_path, approve=approve, runs_dir=self.runs_dir,
+                                  proposal_id=proposal_id, renew=renew)
         except ValueError as exc:
             records = _parse_records(_audit_lines(self.runs_dir)[before:])
             self._send_json(409, {"error": str(exc), "records": records})
@@ -610,6 +635,12 @@ class RelayHandler(BaseHTTPRequestHandler):
             self._send_json(500, {"error": f"internal error: {type(exc).__name__}"})
             return
         records = _parse_records(_audit_lines(self.runs_dir)[before:])
+        if not records and (result.get("pending_replayed")
+                            or result.get("idempotent_replay")):
+            # A replay writes nothing new (that is the point), so the trace
+            # shown is the lead's REAL history from the append-only log:
+            # its records from the most recent match stage onward.
+            records = _lead_history(result["lead_id"], self.runs_dir)
         payload: dict = {
             "lead_id": result["lead_id"],
             "status": result.get("status"),
@@ -621,6 +652,8 @@ class RelayHandler(BaseHTTPRequestHandler):
             payload["proposal"] = result["proposal"]
         if result.get("idempotent_replay"):
             payload["idempotent_replay"] = True
+        if result.get("pending_replayed"):
+            payload["pending_replayed"] = True
         for rec in records:  # real contributions for the score card readout
             if rec.get("stage") == "score":
                 features = (rec.get("inputs") or {}).get("features")
@@ -628,8 +661,17 @@ class RelayHandler(BaseHTTPRequestHandler):
                     payload["score_explain"] = score_explain(features)
                 break
         resolved = result.get("resolved_account")
-        if resolved and resolved.get("account_id") is not None:
-            payload["account"] = account_context_payload(resolved["account_id"])
+        account_id = resolved.get("account_id") if resolved else None
+        if account_id is None:
+            # Replayed runs carry no resolved_account; the account they
+            # resolved to is in the trace (tie_break beats match: it is the
+            # later, human-visible resolution of an ambiguous match).
+            for rec in records:
+                d = rec.get("decision") or {}
+                if rec.get("stage") in ("match", "tie_break") and d.get("account_id"):
+                    account_id = d["account_id"]
+        if account_id is not None:
+            payload["account"] = account_context_payload(account_id)
         self._send_json(200, payload)
 
 

@@ -17,7 +17,7 @@ uv run python -m revenue_engine.ui                      # http://127.0.0.1:5210
 
 **A lead arrives. The system matches it to an account, enriches it from a
 warehouse, judges intent, scores it with a trained model, routes it to a rep,
-and stops for a human — writing an unforgeable record of every step.**
+and stops for a human — writing an append-only record of every step.**
 
 Everything on screen is that sentence, shown from a different angle.
 
@@ -51,7 +51,7 @@ on the right.
 - **FALLBACKS %** is the headline governance number: how often an AI step
   degraded to a deterministic rule and the system kept working anyway.
 - **Rep Desk** shows load per rep, derived from the log — including Priya Raman
-  at 0 routed / 9 skipped, because she is on vacation.
+  at 0 routed / 7 skipped, because she is on vacation.
 
 > Say: "This is the engine's own record of itself. Nothing here is a dashboard
 > metric someone chose — it is a count of what actually happened."
