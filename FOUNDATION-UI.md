@@ -273,3 +273,16 @@ trace instead.
 **Runs never reset rotation.** Every UI run posts `fresh:false`; resetting
 round-robin state is its own labelled control (Round Robin › Reset demo
 rotation) and an explicit `/api/reset-rotation` call — never a side effect.
+
+**Side-effect records are idempotent per PROPOSAL, not per lead.** The outbox
+record written on approval is keyed by `proposal_id`: replaying the same
+approved proposal never rewrites it, but approving a later, different proposal
+supersedes it. Skipping the write whenever the file merely exists left the
+audit log naming one proposal while the assignment on disk carried another.
+Any future side effect must key on the decision's identity, not the lead's.
+
+**Nothing is recorded as done before it is done.** A renew leaves the existing
+pending proposal on disk until its replacement is stored, and the
+`pending_superseded` record is appended at that moment — not before the run.
+A run that dies mid-flight therefore leaves the human a proposal they can
+still approve, and no record of a supersede that never happened.

@@ -339,12 +339,37 @@ def _load_resolved(lead_id: str, runs_dir) -> dict | None:
     return resolved
 
 
+def _display_path(path: Path) -> str:
+    """A path a viewer would recognize: relative to the working directory
+    when it lives under it, absolute otherwise. An audit record must never
+    name a location the side effect did not actually go to."""
+    try:
+        return str(path.relative_to(Path.cwd()))
+    except ValueError:
+        return str(path)
+
+
 def _write_outbox(lead_id: str, proposal: dict, runs_dir) -> str:
-    """The assignment side effect the HITL gate protects: an idempotent
-    outbox record a CRM adapter would consume. Written once per lead —
-    a replayed approve never rewrites it."""
+    """The assignment side effect the HITL gate protects: an outbox record
+    a CRM adapter would consume.
+
+    Idempotent PER PROPOSAL, not per lead: replaying the same approved
+    proposal never rewrites the record, but approving a later, different
+    proposal must supersede it — otherwise the audit log would name one
+    proposal while the side effect on disk still carried another.
+    """
     path = _outbox_path(lead_id, runs_dir)
-    if not path.exists():
+    existing = None
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            existing = None
+    same_proposal = (
+        isinstance(existing, dict)
+        and existing.get("proposal_id") == proposal.get("proposal_id")
+    )
+    if not same_proposal:
         _atomic_write_json(path, {
             "action": "apply_assignment",
             "lead_id": lead_id,
@@ -355,7 +380,7 @@ def _write_outbox(lead_id: str, proposal: dict, runs_dir) -> str:
             "sla_minutes": proposal.get("sla_minutes"),
             "applied_at": datetime.now(timezone.utc).isoformat(),
         })
-    return f"runs/{OUTBOX_DIRNAME}/{lead_id}.json"
+    return _display_path(path)
 
 
 def _check_proposal_id(lead_id: str, proposal: dict, proposal_id: str | None,
@@ -614,8 +639,8 @@ def run(
 
     # Immutable review contract: while a valid pending proposal exists, a
     # plain preview run returns THAT proposal instead of computing a new
-    # one. Only an explicit renew supersedes it, and the supersede itself
-    # is audited before the old proposal is discarded.
+    # one. Only an explicit renew supersedes it.
+    superseded_id: str | None = None
     if approve is None:
         existing = _load_pending(lead_id, runs_dir)
         if existing is not None:
@@ -628,16 +653,11 @@ def run(
                     "status": "pending_approval",
                     "pending_replayed": True,
                 }
-            audit.append(
-                stage="pending_superseded",
-                lead_id=lead_id,
-                inputs={"superseded_proposal_id":
-                        existing["proposal"].get("proposal_id")},
-                decision={"reason": "explicit_renew"},
-                rule_fired="pending_superseded",
-                runs_dir=runs_dir,
-            )
-            _clear_pending(lead_id, runs_dir)
+            # The old proposal stays on disk until its replacement is
+            # stored: a renew that dies mid-run leaves the human with a
+            # proposal they can still approve, and nothing is recorded as
+            # superseded because nothing was.
+            superseded_id = existing["proposal"].get("proposal_id")
 
     stages: list[dict] = []
     result: dict = {"lead_id": lead_id, "stages": stages, "llm": llm}
@@ -646,7 +666,7 @@ def run(
             lead, lead_id, stages, result,
             llm=llm, approve=approve, runs_dir=runs_dir,
             db_path=db_path, model_path=model_path, as_of=as_of,
-            lead_path=lead_path,
+            lead_path=lead_path, superseded_id=superseded_id,
         )
     except Exception as exc:
         # Every run terminates with a recorded outcome: a crash leaves a
@@ -678,6 +698,7 @@ def _execute(
     model_path,
     as_of,
     lead_path=None,
+    superseded_id: str | None = None,
 ) -> dict:
     con = warehouse.connect(db_path or config.SEED_DB)
     try:
@@ -900,5 +921,19 @@ def _execute(
         # Persist the pending proposal so a later approve/reject acts on
         # EXACTLY this proposal instead of re-running the pipeline.
         _store_pending(lead_id, proposal, runs_dir, lead_path=lead_path)
+        if superseded_id is not None:
+            # Recorded only now, because only now was anything replaced.
+            _record(
+                stages,
+                audit.append(
+                    stage="pending_superseded",
+                    lead_id=lead_id,
+                    inputs={"superseded_proposal_id": superseded_id,
+                            "replacement_proposal_id": proposal["proposal_id"]},
+                    decision={"reason": "explicit_renew"},
+                    rule_fired="pending_superseded",
+                    runs_dir=runs_dir,
+                ),
+            )
         result["status"] = "pending_approval"
     return result

@@ -707,3 +707,70 @@ def test_unparseable_lead_writes_pipeline_error_record(tmp_path):
     records = _audit_records(tmp_path)
     assert [r["stage"] for r in records] == ["pipeline_error"]
     assert records[0]["lead_id"] == "broken"  # file stem: best id available
+
+
+# ---------------------------------------------------------------------------
+# Second-pass hardening (CodeRabbit review of the 08-07 audit fixes)
+# ---------------------------------------------------------------------------
+
+def test_outbox_superseded_when_a_different_proposal_is_approved(tmp_path):
+    """The outbox is idempotent per PROPOSAL, not per lead. Approving a
+    second, different proposal must not leave the first one's assignment on
+    disk while the audit log names the second."""
+    first = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)["proposal"]
+    pipeline.run(LEAD_CLEAN, approve=True, runs_dir=tmp_path)
+    outbox = tmp_path / "outbox" / "L-1001.json"
+    assert json.loads(outbox.read_text())["proposal_id"] == first["proposal_id"]
+
+    # A fresh preview after resolution mints a new proposal; approving it
+    # must supersede the outbox record.
+    second = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)["proposal"]
+    assert second["proposal_id"] != first["proposal_id"]
+    pipeline.run(LEAD_CLEAN, approve=True, runs_dir=tmp_path)
+    written = json.loads(outbox.read_text())
+    assert written["proposal_id"] == second["proposal_id"]
+    assert written["rep"] == second["rep"]
+
+    # And the audit log's last applied record agrees with what is on disk.
+    applied = [r for r in _audit_records(tmp_path) if r["stage"] == "assignment_applied"]
+    assert applied[-1]["decision"]["proposal_id"] == written["proposal_id"]
+
+
+def test_outbox_path_in_audit_record_points_at_the_real_file(tmp_path):
+    """The audit record must name where the side effect actually landed —
+    never a hardcoded 'runs/...' that does not exist."""
+    pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)
+    pipeline.run(LEAD_CLEAN, approve=True, runs_dir=tmp_path)
+    applied = [r for r in _audit_records(tmp_path) if r["stage"] == "assignment_applied"][-1]
+    named = Path(applied["decision"]["outbox"])
+    if not named.is_absolute():
+        named = Path.cwd() / named
+    assert named.exists(), f"audit names {applied['decision']['outbox']!r}, which does not exist"
+    assert named.resolve() == (tmp_path / "outbox" / "L-1001.json").resolve()
+
+
+def test_failed_renew_preserves_the_reviewable_proposal(tmp_path):
+    """A renew that dies mid-run must leave the human the proposal they
+    could still approve, and must record no supersede that never happened."""
+    original = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)["proposal"]
+    with pytest.raises(FileNotFoundError):
+        pipeline.run(LEAD_CLEAN, runs_dir=tmp_path, renew=True,
+                     model_path=tmp_path / "no-such-model.joblib")
+    pending = json.loads((tmp_path / "pending" / "L-1001.json").read_text())
+    assert pending["proposal"]["proposal_id"] == original["proposal_id"]
+    assert "pending_superseded" not in _stages(tmp_path)
+    # The surviving proposal is still approvable, by its own id.
+    ok = pipeline.run(LEAD_CLEAN, approve=True, runs_dir=tmp_path,
+                      proposal_id=original["proposal_id"])
+    assert ok["status"] == "assignment_applied"
+
+
+def test_successful_renew_records_both_proposal_ids(tmp_path):
+    original = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path)["proposal"]
+    replacement = pipeline.run(LEAD_CLEAN, runs_dir=tmp_path, renew=True)["proposal"]
+    superseded = [r for r in _audit_records(tmp_path)
+                  if r["stage"] == "pending_superseded"]
+    assert len(superseded) == 1
+    inputs = superseded[0]["inputs"]
+    assert inputs["superseded_proposal_id"] == original["proposal_id"]
+    assert inputs["replacement_proposal_id"] == replacement["proposal_id"]
