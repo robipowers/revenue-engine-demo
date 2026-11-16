@@ -8,3 +8,7 @@ __pycache__/
 .venv/
 STUDY-GUIDE.html
 runs/_dev_archive/
+
+# Salesforce CLI local state
+.sf/
+.sfdx/

@@ -39,6 +39,58 @@ def normalize_name(name: str) -> str:
     return " ".join(tokens)
 
 
+def match_records(
+    accounts: list[dict], name: str | None = None, domain: str | None = None
+) -> MatchResult:
+    """Same policy as match_account, over an in-memory account list.
+
+    Each account is {"id", "name", "domain"}. Used when the accounts come
+    from somewhere other than the warehouse (the Salesforce adapter). The
+    ids are opaque here, so ties sort on str(id).
+    """
+    if domain:
+        wanted = domain.strip().lower()
+        for acct in accounts:
+            if (acct.get("domain") or "").strip().lower() == wanted:
+                return MatchResult(
+                    status="matched",
+                    account_id=acct["id"],
+                    account_name=acct["name"],
+                    score=100.0,
+                    method="domain_exact",
+                )
+
+    if not name or not accounts:
+        return MatchResult(status="no_match")
+
+    query = normalize_name(name)
+    scored = [
+        {
+            "account_id": acct["id"],
+            "name": acct["name"],
+            "score": round(fuzz.token_set_ratio(query, normalize_name(acct["name"])), 1),
+        }
+        for acct in accounts
+    ]
+    scored.sort(key=lambda c: (-c["score"], str(c["account_id"])))
+    best = scored[0]
+
+    if best["score"] >= AUTO_MATCH_THRESHOLD:
+        return MatchResult(
+            status="matched",
+            account_id=best["account_id"],
+            account_name=best["name"],
+            score=best["score"],
+            method="fuzzy_name",
+        )
+    candidates = [c for c in scored if c["score"] >= AMBIGUOUS_THRESHOLD]
+    if candidates:
+        return MatchResult(
+            status="ambiguous", score=best["score"], method="fuzzy_name", candidates=candidates
+        )
+    return MatchResult(status="no_match", score=best["score"], method="fuzzy_name")
+
+
 def match_account(con, name: str | None = None, domain: str | None = None) -> MatchResult:
     """Match a lead to a warehouse account by domain (exact) or name (fuzzy)."""
     if domain:

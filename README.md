@@ -112,6 +112,25 @@ A pending run persists its proposal to `runs/pending/<lead_id>.json`. A later `-
 
 If asked about the no-match path: `lead_003.json` (an unknown company) exits with a structured `create_account` proposal instead of guessing.
 
+## Salesforce adapter
+
+The same matching and territory rules, run against real Leads in a Salesforce org through the Salesforce CLI. Added 2026-11-16 against a Developer Edition org with made-up records.
+
+```
+uv run python -m revenue_engine.salesforce            # dry run: prints proposals, writes nothing
+uv run python -m revenue_engine.salesforce --apply    # writes to the org
+uv run python -m revenue_engine.salesforce --lead <LeadId> --apply
+```
+
+- **Where it gets its information:** open Leads, Accounts, active users and the `Relay_*` queues, read with SOQL through `sf data query`. Org alias `robi-dev`, or set `RELAY_SF_ORG`.
+- **What it writes on the Lead:** `OwnerId`, `Matched_Account__c` (a lookup to Account, because a standard Lead has no link to one) and `Routing_Rule__c` (which rule set the owner).
+- **Rules:** a matched Lead goes to the Account's owner if that user is active. Every other Lead goes to its territory queue. An ambiguous match is never guessed: it goes to the queue with the candidates in the audit log.
+- **What a person still checks:** ambiguous matches, and anything with `fallback_used`.
+- **Audit:** `sf_match`, `sf_route` and `sf_write` records in `runs/audit.jsonl`. A second `--apply` writes nothing (`no_change`).
+- **Org setup:** `salesforce/force-app` holds the two Lead fields, four queues and a permission set. Deploy with `sf project deploy start --source-dir force-app -o <org>` from `salesforce/`, then `sf org assign permset --name Relay_Routing -o <org>`.
+
+Not in the adapter: propensity scoring (the model's features live in the demo warehouse), round robin inside a queue, SLA timers, lead conversion, consent checks.
+
 ## Architecture
 
 ```
