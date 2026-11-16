@@ -123,13 +123,42 @@ uv run python -m revenue_engine.salesforce --lead <LeadId> --apply
 ```
 
 - **Where it gets its information:** open Leads, Accounts, active users and the `Relay_*` queues, read with SOQL through `sf data query`. Org alias `robi-dev`, or set `RELAY_SF_ORG`.
-- **What it writes on the Lead:** `OwnerId`, `Matched_Account__c` (a lookup to Account, because a standard Lead has no link to one) and `Routing_Rule__c` (which rule set the owner).
-- **Rules:** a matched Lead goes to the Account's owner if that user is active. Every other Lead goes to its territory queue. An ambiguous match is never guessed: it goes to the queue with the candidates in the audit log.
-- **What a person still checks:** ambiguous matches, and anything with `fallback_used`.
-- **Audit:** `sf_match`, `sf_route` and `sf_write` records in `runs/audit.jsonl`. A second `--apply` writes nothing (`no_change`).
-- **Org setup:** `salesforce/force-app` holds the two Lead fields, four queues and a permission set. Deploy with `sf project deploy start --source-dir force-app -o <org>` from `salesforce/`, then `sf org assign permset --name Relay_Routing -o <org>`.
+- **What it writes on the Lead:** `OwnerId`, `Matched_Account__c` (a lookup to Account, because a standard Lead has no link to one), `Routing_Rule__c` (which rule set the owner), `Routing_Note__c` (the match detail and the reason) and `Routing_SLA_Due__c`.
+- **What a person still checks:** ambiguous matches, leads in the consent hold queue, and anything with `fallback_used`.
+- **Audit:** `sf_match`, `sf_route`, `sf_write` and `sf_sla` records in `runs/audit.jsonl`. A second `--apply` writes nothing (`no_change`).
+- **Org setup:** `salesforce/force-app` holds five Lead fields, five queues, a list view and a permission set. Deploy with `sf project deploy start --source-dir force-app -o <org>` from `salesforce/`, then `sf org assign permset --name Relay_Routing -o <org>`.
 
-Not in the adapter: propensity scoring (the model's features live in the demo warehouse), round robin inside a queue, SLA timers, lead conversion, consent checks.
+Rules, in the order they run. They live in `config/routing.json`, so they change without a code change.
+
+| Step | Rule | Routing Rule value |
+|---|---|---|
+| Consent | A lead from a consent region (EMEA by default) with `Consent_Given__c` unticked goes to a hold queue. Nobody works it until consent is on record. | `consent_hold` |
+| Duplicate lead | A lead whose email already belongs to a lead a rep owns goes to that same rep. | `duplicate_lead_same_owner` |
+| Match | Existing Contact email, then exact domain, then fuzzy name. Free-mail domains are ignored. | (in Routing Note) |
+| Duplicate accounts | Several accounts for the same company are resolved by ordered tiebreakers: open opportunity, customer, latest activity, oldest account. | (in Routing Note) |
+| Different companies tied | Never guessed. The lead goes to the queue with the candidates listed. | `ambiguous_match_to_queue` |
+| Owner | The matched account's owner. If that user is inactive, the first active owner up the parent chain. `hierarchy.mode: ultimate_parent` sends everything to the top of the hierarchy instead. | `account_owner`, `customer_account_owner`, `parent_account_owner`, `ultimate_parent_owner` |
+| Queue | No account owner: the territory queue. | `territory_queue` |
+| Assign | Inside a queue: the least-loaded member who is active, inside working hours and under the open-lead cap. Otherwise the lead waits in the queue and the note says why. | `round_robin_least_loaded` |
+| SLA | Due time from lead creation: 15 minutes for a customer or an account with an open opportunity, 60 for any other match, 240 otherwise. | `Routing_SLA_Due__c` |
+
+A lead a rep already owns is settled: a re-run does not move it (`--reroute` overrides). Leads waiting in a queue are re-decided every run, so they drain to reps when hours open or consent arrives.
+
+```
+uv run python -m revenue_engine.salesforce --sla           # unworked leads past their due time
+uv run python -m revenue_engine.salesforce --sla --apply   # send a rep's breached lead back to the queue
+uv run python -m revenue_engine.salesforce --bench 5000    # time matching + routing, no org needed
+```
+
+Measured 2026-11-16 on a 2021 MacBook Pro: 5,000 generated leads against 2,000 accounts in 5.4 seconds, matching and routing only, no org calls.
+
+Limits, stated plainly:
+
+- Tested in a dev org with 7 made-up leads and one real user. Round robin, the open-lead cap, working hours, parent-chain owners and duplicate leads are covered by unit tests, not shown in the org, because the queues have no members.
+- Writes go one record at a time through the CLI. Fine for a demo; a production version would use the Bulk API.
+- No propensity scoring in the org (the model's features live in the demo warehouse), no lead conversion, no buying groups or partner routing.
+- Consent is one checkbox. Real consent rules differ by country and by channel.
+- Salesforce's own duplicate rule blocks creating a Lead whose email matches an existing Contact, so the Contact-email match path could not be shown in this org.
 
 ## Architecture
 

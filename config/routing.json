@@ -1,0 +1,17 @@
+{
+  "_readme": "Routing rules for the Salesforce adapter. Data, not code: an ops owner can change these without a deploy.",
+  "match": { "auto_threshold": 90, "ambiguous_threshold": 70 },
+  "tiebreakers": ["open_opportunity", "customer", "latest_activity", "oldest_account"],
+  "customer_types": ["Customer - Direct", "Customer - Channel"],
+  "hierarchy": { "mode": "matched_then_parent" },
+  "consent": { "regions": ["EMEA"], "hold_queue": "Relay_Consent_Hold" },
+  "round_robin": { "cap_open_leads": 25 },
+  "working_hours": {
+    "AMER-East": { "tz": "America/New_York", "start": 8, "end": 18 },
+    "AMER-West": { "tz": "America/Los_Angeles", "start": 8, "end": 18 },
+    "EMEA": { "tz": "Europe/London", "start": 8, "end": 18 },
+    "APAC": { "tz": "Asia/Singapore", "start": 8, "end": 18 }
+  },
+  "sla_minutes": { "hot": 15, "matched": 60, "default": 240 },
+  "sla_unworked_statuses": ["Open - Not Contacted"]
+}
